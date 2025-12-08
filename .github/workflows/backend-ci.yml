@@ -42,6 +42,5 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/simuhire_test
-          DATABASE_URL_SYNC: postgresql+psycopg2://postgres:postgres@localhost:5432/simuhire_test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simuhire_test
         run: poetry run pytest

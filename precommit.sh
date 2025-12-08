@@ -3,18 +3,20 @@ set -euo pipefail
 
 echo "🔍 Running pre-commit checks..."
 
+# Directory of THIS script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ -d "backend" ]; then
-  echo "➡️  Linting backend with Ruff..."
-  poetry run ruff check backend
+# cd into backend dir (where pyproject.toml actually is)
+cd "$SCRIPT_DIR"
 
-  echo "➡️  Formatting backend with Ruff..."
-  poetry run ruff format backend
+echo "➡️  Linting backend with Ruff..."
+poetry run ruff check . --fix
 
-  echo "➡️  Running backend tests..."
-  poetry run pytest --maxfail=1
-fi
+echo "➡️  Formatting backend with Ruff..."
+poetry run ruff format . 
 
+echo "➡️  Running backend tests..."
+poetry run pytest --maxfail=1
 
 echo "✅ All pre-commit checks passed!"
 exit 0

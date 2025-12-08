@@ -1,29 +1,24 @@
-# tests/conftest.py
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
 
-# Build async DB URL from the sync one dynamically.
-ASYNC_DB_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-
 
 @pytest_asyncio.fixture
-async def async_session() -> AsyncSession:
-    """
-    Simple per-test async session.
+async def async_session():
+    ASYNC_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+    engine = create_async_engine(ASYNC_URL, echo=False)
 
-    - Creates an async engine to the test DB
-    - Yields a single AsyncSession
-    - Disposes the engine after the test
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "TRUNCATE companies, users, simulations, tasks, candidate_sessions, submissions RESTART IDENTITY CASCADE"
+            )
+        )
 
-    Schema is assumed to already exist (via Alembic migrations).
-    """
-    engine = create_async_engine(ASYNC_DB_URL, echo=False, future=True)
     SessionLocal = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
+        engine, expire_on_commit=False, class_=AsyncSession
     )
 
     async with SessionLocal() as session:
