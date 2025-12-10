@@ -15,6 +15,10 @@ jobs:
       DATABASE_URL_ASYNC: postgresql+asyncpg://postgres:postgres@localhost:5432/simuhire_test
       ENV: ci
 
+      AUTH0_DOMAIN: simuhire.us.auth0.com
+      AUTH0_API_AUDIENCE: https://simuhire.com/api
+      AUTH0_ALGORITHMS: RS256
+
     services:
       postgres:
         image: postgres:15
