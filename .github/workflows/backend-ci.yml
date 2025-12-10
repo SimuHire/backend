@@ -10,10 +10,14 @@ jobs:
 
     env:
       PYTHONPATH: ${{ github.workspace }}
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simuhire_test
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/simuhire_test
       DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/simuhire_test
       DATABASE_URL_ASYNC: postgresql+asyncpg://postgres:postgres@localhost:5432/simuhire_test
       ENV: ci
+
+      AUTH0_DOMAIN: simuhire.us.auth0.com
+      AUTH0_API_AUDIENCE: https://simuhire.com/api
+      AUTH0_ALGORITHMS: RS256
 
     services:
       postgres:
