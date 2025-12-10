@@ -1,9 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.models.user import User
+from app.schemas.user import UserRead
+from app.security.current_user import get_current_user
 
 router = APIRouter()
 
 
-@router.post("/login")
-async def login():
-    # Will implement in M0 once User model + JWT are ready
-    return {"message": "login placeholder"}
+@router.get("/me", response_model=UserRead)
+async def read_me(current_user: User = Depends(get_current_user)) -> User:  # noqa: B008
+    return current_user
