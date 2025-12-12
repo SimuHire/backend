@@ -5,10 +5,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    pass
+    """Base declarative class for ORM models."""
 
 
 class TimestampMixin:
+    """Shared timestamp columns for created records."""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -5,6 +5,8 @@ from app.models.base import Base, TimestampMixin
 
 
 class Company(Base, TimestampMixin):
+    """Company that owns simulations and users."""
+
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

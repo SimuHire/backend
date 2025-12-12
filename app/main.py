@@ -5,6 +5,7 @@ from app.routers import auth, candidate, health, simulations
 
 
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
     app = FastAPI(title="SimuHire Backend", version="0.1.0")
 
     # Routers

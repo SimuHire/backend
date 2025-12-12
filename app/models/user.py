@@ -5,6 +5,8 @@ from app.models.base import Base, TimestampMixin
 
 
 class User(Base, TimestampMixin):
+    """User record for recruiters and candidates."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

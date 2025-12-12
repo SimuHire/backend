@@ -18,18 +18,24 @@ from app.db import Base
 
 
 class UserRole(str, enum.Enum):
+    """User roles available in the application."""
+
     RECRUITER = "recruiter"
     CANDIDATE = "candidate"
     ADMIN = "admin"
 
 
 class SimulationStatus(str, enum.Enum):
+    """Lifecycle states for a simulation."""
+
     DRAFT = "draft"
     ACTIVE = "active"
     ARCHIVED = "archived"
 
 
 class TaskType(str, enum.Enum):
+    """Types of tasks a candidate can receive."""
+
     DESIGN = "design"
     CODE = "code"
     DEBUG = "debug"
@@ -38,6 +44,8 @@ class TaskType(str, enum.Enum):
 
 
 class CandidateSessionStatus(str, enum.Enum):
+    """Status of a candidate's session."""
+
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -45,6 +53,8 @@ class CandidateSessionStatus(str, enum.Enum):
 
 
 class Company(Base):
+    """Organization that owns users and simulations."""
+
     __tablename__ = "companies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -62,6 +72,8 @@ class Company(Base):
 
 
 class User(Base):
+    """System user representing recruiters or candidates."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -91,6 +103,8 @@ class User(Base):
 
 
 class Simulation(Base):
+    """Simulation assigned to candidates."""
+
     __tablename__ = "simulations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -125,6 +139,8 @@ class Simulation(Base):
 
 
 class Task(Base):
+    """Individual task within a simulation."""
+
     __tablename__ = "tasks"
     __table_args__ = (
         UniqueConstraint(
@@ -156,6 +172,8 @@ class Task(Base):
 
 
 class CandidateSession(Base):
+    """Invitation and state for a candidate taking a simulation."""
+
     __tablename__ = "candidate_sessions"
     __table_args__ = (UniqueConstraint("token", name="uq_candidate_sessions_token"),)
 
@@ -193,6 +211,8 @@ class CandidateSession(Base):
 
 
 class Submission(Base):
+    """Submission for a specific task by a candidate."""
+
     __tablename__ = "submissions"
     __table_args__ = (
         UniqueConstraint(

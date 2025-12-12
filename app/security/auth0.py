@@ -10,6 +10,8 @@ from app.config import settings
 
 
 class Auth0Error(HTTPException):
+    """Raised when Auth0 token validation fails."""
+
     def __init__(
         self, detail: str, status_code: int = status.HTTP_401_UNAUTHORIZED
     ) -> None:
@@ -18,12 +20,14 @@ class Auth0Error(HTTPException):
 
 @lru_cache(maxsize=1)
 def get_jwks() -> dict[str, Any]:
+    """Fetch and cache the JWKS keys from Auth0."""
     response = httpx.get(settings.auth0_jwks_url, timeout=5)
     response.raise_for_status()
     return response.json()
 
 
 def decode_auth0_token(token: str) -> dict[str, Any]:
+    """Validate a JWT from Auth0 and return its claims."""
     try:
         unverified_header = jwt.get_unverified_header(token)
     except JWTError as exc:

@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables and `.env`."""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     ENV: str = "local"
@@ -46,6 +48,7 @@ class Settings(BaseSettings):
     @property
     def database_url_async(self) -> str:
         """Async DSN for SQLAlchemy async engine (asyncpg).
+
         Converts postgresql://... -> postgresql+asyncpg://...
         """
         url = self.database_url_sync
@@ -57,23 +60,29 @@ class Settings(BaseSettings):
 
     @property
     def auth0_issuer(self) -> str:
+        """Issuer URL used to validate Auth0 tokens."""
         if self.AUTH0_ISSUER:
             return self.AUTH0_ISSUER
         return f"https://{self.AUTH0_DOMAIN}/"
 
     @property
     def auth0_jwks_url(self) -> str:
+        """JWKS endpoint for Auth0 public keys."""
         if self.AUTH0_JWKS_URL:
             return self.AUTH0_JWKS_URL
         return f"https://{self.AUTH0_DOMAIN}/.well-known/jwks.json"
 
     @property
     def auth0_audience(self) -> str:
+        """Expected API audience for Auth0 tokens."""
         return self.AUTH0_API_AUDIENCE
 
     @property
     def auth0_algorithms(self) -> list[str]:
-        parts = [part.strip() for part in self.AUTH0_ALGORITHMS.split(",") if part.strip()]
+        """Allowed JWT signing algorithms."""
+        parts = [
+            part.strip() for part in self.AUTH0_ALGORITHMS.split(",") if part.strip()
+        ]
         return parts or ["RS256"]
 
 

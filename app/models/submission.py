@@ -7,6 +7,8 @@ from app.models.base import Base
 
 
 class Submission(Base):
+    """Candidate submission for a task."""
+
     __tablename__ = "submissions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

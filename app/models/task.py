@@ -5,6 +5,8 @@ from app.models.base import Base
 
 
 class Task(Base):
+    """Task definition assigned within a simulation."""
+
     __tablename__ = "tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

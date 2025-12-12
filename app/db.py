@@ -28,5 +28,6 @@ Base = declarative_base()
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield a scoped async database session."""
     async with async_session_maker() as session:
         yield session

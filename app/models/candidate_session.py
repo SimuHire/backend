@@ -5,6 +5,8 @@ from app.models.base import Base
 
 
 class CandidateSession(Base):
+    """Candidate's invitation and progress for a simulation."""
+
     __tablename__ = "candidate_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

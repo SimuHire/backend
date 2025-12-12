@@ -5,6 +5,8 @@ from app.models.base import Base, TimestampMixin
 
 
 class Simulation(Base, TimestampMixin):
+    """Simulation configuration owned by a company."""
+
     __tablename__ = "simulations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
