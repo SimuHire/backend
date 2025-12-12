@@ -1,23 +1,46 @@
 name: Backend CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+  ENV: ci
+  AUTH0_DOMAIN: simuhire.us.auth0.com
+  AUTH0_API_AUDIENCE: https://simuhire.com/api
+  AUTH0_ALGORITHMS: RS256
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Ruff lint
+        run: poetry run ruff check . --output-format=github
+
+      - name: Ruff format check
+        run: poetry run ruff format --check .
+
   test:
     runs-on: ubuntu-latest
-
-    env:
-      PYTHONPATH: ${{ github.workspace }}
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/simuhire_test
-      DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/simuhire_test
-      DATABASE_URL_ASYNC: postgresql+asyncpg://postgres:postgres@localhost:5432/simuhire_test
-      ENV: ci
-
-      AUTH0_DOMAIN: simuhire.us.auth0.com
-      AUTH0_API_AUDIENCE: https://simuhire.com/api
-      AUTH0_ALGORITHMS: RS256
 
     services:
       postgres:
@@ -34,16 +57,17 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+    env:
+      DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/simuhire_test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simuhire_test
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: "poetry"
 
       - name: Install Poetry
         run: pip install poetry
@@ -55,4 +79,4 @@ jobs:
         run: poetry run alembic upgrade head
 
       - name: Run tests
-        run: poetry run pytest
+        run: poetry run pytest -q

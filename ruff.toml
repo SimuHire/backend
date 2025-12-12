@@ -1,23 +1,44 @@
-line-length = 88
-indent-width = 4
+# ruff.toml
 target-version = "py311"
+line-length = 88
 
-[format]
-quote-style = "double"
-indent-style = "space"
-line-ending = "auto"
+extend-exclude = [
+  ".venv",
+  "alembic/versions",
+]
 
 [lint]
+# Core: correctness + maintainability + “dead stuff”
 select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "I",   # import sorting
-    "B",   # bugbear
-    "UP",  # pyupgrade
-]
-ignore = [
-    "E501",  # Ruff will handle line-length automatically
+  "F",      # Pyflakes: unused imports/vars, undefined names, etc.
+  "E", "W", # Basic PEP8
+  "I",      # Import sorting
+  "B",      # Bugbear: common footguns
+  "UP",     # Pyupgrade: modern Python
+  "SIM",    # Simplify
+  "RUF",    # Ruff-specific (includes unused noqa, etc.)
+  "ERA",    # Commented-out code detection (dead code in comments)
+  "ARG",    # Unused function arguments (can be noisy; we tame below)
+  "D",      # Docstrings (closest thing to “no comments”)
 ]
 
-[lint.isort]
-combine-as-imports = true
+# Keep it practical: don’t force docstrings everywhere at first.
+ignore = [
+  "E501",   # line length (ruff formatter handles this)
+  "D100",   # missing docstring in public module
+  "D104",   # missing docstring in public package
+  "D107",   # missing docstring in __init__
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+# Tests: docstrings/unused args are not worth fighting
+"tests/**/*.py" = ["D", "ARG"]
+# Alembic: generated / verbose
+"alembic/**/*.py" = ["D", "ARG", "ERA"]
+
+# Optional: if you use a lot of FastAPI deps like `request: Request` unused,
+# keep ARG enabled but allow underscore-prefixed unused params.
+# (Ruff already treats leading underscore as “intentionally unused”.)
