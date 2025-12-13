@@ -8,6 +8,7 @@ from app.models.user import User
 
 
 async def main():
+    """Seed local recruiters into the database."""
     async with async_session_maker() as s:
         # Ensure company exists
         c = await s.scalar(select(Company).where(Company.name == "LocalCo"))
