@@ -1,22 +1,67 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.models.candidate_session import CandidateSession
 from app.models.simulation import Simulation
 from app.models.task import Task
-from app.schemas.simulation import SimulationCreate, SimulationCreateResponse, TaskOut
+from app.schemas.simulation import (
+    SimulationCreate,
+    SimulationCreateResponse,
+    SimulationListItem,
+    TaskOut,
+)
 from app.security.current_user import get_current_user
 from app.services.simulation_blueprint import DEFAULT_5_DAY_BLUEPRINT
 
 router = APIRouter()
 
 
-@router.get("", status_code=status.HTTP_200_OK)
-async def list_simulations():
-    """List available simulations (placeholder)."""
-    return []
+@router.get("", response_model=list[SimulationListItem], status_code=status.HTTP_200_OK)
+async def list_simulations(
+    db: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[Any, Depends(get_current_user)],
+):
+    """List simulations for recruiter dashboard (scoped to current user)."""
+    if getattr(user, "role", None) not in (None, "recruiter"):
+        raise HTTPException(status_code=403, detail="Recruiter access required")
+
+    counts_subq = (
+        select(
+            CandidateSession.simulation_id.label("simulation_id"),
+            func.count(CandidateSession.id).label("num_candidates"),
+        )
+        .group_by(CandidateSession.simulation_id)
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Simulation,
+            func.coalesce(counts_subq.c.num_candidates, 0).label("num_candidates"),
+        )
+        .outerjoin(counts_subq, counts_subq.c.simulation_id == Simulation.id)
+        .where(Simulation.created_by == user.id)
+        .order_by(Simulation.created_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        SimulationListItem(
+            id=sim.id,
+            title=sim.title,
+            role=sim.role,
+            techStack=sim.tech_stack,
+            createdAt=sim.created_at,
+            numCandidates=int(num_candidates),
+        )
+        for sim, num_candidates in rows
+    ]
 
 
 @router.post(
@@ -28,7 +73,6 @@ async def create_simulation(
     user: Annotated[Any, Depends(get_current_user)],
 ):
     """Create a simulation and seed default tasks."""
-    # If get_current_user already enforces recruiter, you can remove this.
     if getattr(user, "role", None) not in (None, "recruiter"):
         raise HTTPException(status_code=403, detail="Recruiter access required")
 
@@ -44,7 +88,7 @@ async def create_simulation(
     )
 
     db.add(sim)
-    await db.flush()
+    await db.flush()  # ensures sim.id is populated
 
     created_tasks: list[Task] = []
     for t in DEFAULT_5_DAY_BLUEPRINT:

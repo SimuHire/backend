@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -41,6 +42,22 @@ class SimulationCreateResponse(BaseModel):
     seniority: str
     focus: str
     tasks: list[TaskOut]
+
+    class Config:
+        """Pydantic configuration."""
+
+        from_attributes = True
+
+
+class SimulationListItem(BaseModel):
+    """List item for recruiter dashboard simulations."""
+
+    id: int
+    title: str
+    role: str
+    techStack: str
+    createdAt: datetime
+    numCandidates: int
 
     class Config:
         """Pydantic configuration."""
