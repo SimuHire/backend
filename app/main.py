@@ -13,8 +13,17 @@ def _parse_csv(value: str | None) -> list[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
+def _env_name() -> str:
+    return str(getattr(settings, "ENV", os.getenv("ENV", "local"))).lower()
+
+
 def create_app() -> FastAPI:
     """Instantiate and configure the FastAPI application."""
+    if os.getenv("DEV_AUTH_BYPASS") == "1" and _env_name() != "local":
+        raise RuntimeError(
+            "Refusing to start: DEV_AUTH_BYPASS enabled outside ENV=local"
+        )
+
     app = FastAPI(title="SimuHire Backend", version="0.1.0")
 
     try:
