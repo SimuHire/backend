@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.task import TaskPublic
+
 
 class CandidateInviteRequest(BaseModel):
     """Schema for inviting a candidate to a simulation."""
@@ -35,3 +37,22 @@ class CandidateSessionResolveResponse(BaseModel):
     completedAt: datetime | None
     candidateName: str
     simulation: CandidateSimulationSummary
+
+
+class ProgressSummary(BaseModel):
+    """Summary of progress for the candidate session."""
+
+    completed: int
+    total: int
+
+
+class CurrentTaskResponse(BaseModel):
+    """Schema for the current task assigned to the candidate."""
+
+    candidateSessionId: int
+    status: str
+    currentDayIndex: int | None
+    currentTask: TaskPublic | None
+    completedTaskIds: list[int]
+    progress: ProgressSummary
+    isComplete: bool

@@ -34,6 +34,11 @@ if [[ "$1" == "migrate" ]]; then
     exit 0
 fi
 
+echo "🌱 Seeding local recruiters..."
+export ENV=local
+export DEV_AUTH_BYPASS=1
+poetry run python scripts/seed_local_recruiters.py
+
 echo "🔧 Starting FastAPI server..."
 
 $RUN uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

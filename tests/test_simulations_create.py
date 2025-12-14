@@ -47,8 +47,8 @@ async def test_create_simulation_creates_sim_and_5_tasks(async_client, async_ses
         assert [t["type"] for t in data["tasks"]] == [
             "design",
             "code",
-            "code",
             "debug",
+            "handoff",
             "documentation",
         ]
     finally:

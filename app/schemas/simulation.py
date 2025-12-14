@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-TaskType = Literal["design", "code", "debug", "documentation"]
+TaskType = Literal["design", "code", "debug", "handoff", "documentation"]
 
 
 class SimulationCreate(BaseModel):
