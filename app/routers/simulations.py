@@ -107,6 +107,7 @@ async def create_simulation(
             day_index=t["day_index"],
             type=t["type"],
             title=t["title"],
+            description=t["description"],
         )
         db.add(task)
         created_tasks.append(task)

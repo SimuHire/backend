@@ -1,17 +1,22 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Header, HTTPException, Path
+from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.models.candidate_session import CandidateSession
+from app.models.submission import Submission
+from app.models.task import Task
 from app.schemas.candidate_session import (
     CandidateSessionResolveResponse,
     CandidateSimulationSummary,
+    CurrentTaskResponse,
+    ProgressSummary,
 )
+from app.schemas.task import TaskPublic
 
 router = APIRouter()
 
@@ -62,4 +67,87 @@ async def resolve_candidate_session(
             title=sim.title,
             role=sim.role,
         ),
+    )
+
+
+@router.get(
+    "/session/{candidate_session_id}/current_task",
+    response_model=CurrentTaskResponse,
+)
+async def get_current_task(
+    candidate_session_id: int,
+    x_candidate_token: Annotated[str, Header(..., alias="x-candidate-token")],
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> CurrentTaskResponse:
+    """Return the current task for a candidate session.
+
+    The current task is defined as the lowest day_index task
+    that does not yet have a submission from this candidate.
+    """
+    stmt = select(CandidateSession).where(CandidateSession.id == candidate_session_id)
+    res = await db.execute(stmt)
+    cs = res.scalar_one_or_none()
+
+    if cs is None:
+        raise HTTPException(status_code=404, detail="Candidate session not found")
+
+    if cs.token != x_candidate_token:
+        raise HTTPException(status_code=404, detail="Candidate session not found")
+
+    now = datetime.now(UTC)
+
+    if cs.expires_at is not None and cs.expires_at < now:
+        raise HTTPException(status_code=410, detail="Invite token expired")
+
+    tasks_stmt = (
+        select(Task)
+        .where(Task.simulation_id == cs.simulation_id)
+        .order_by(Task.day_index.asc())
+    )
+    tasks_res = await db.execute(tasks_stmt)
+    tasks = list(tasks_res.scalars().all())
+
+    if not tasks:
+        raise HTTPException(status_code=500, detail="Simulation has no tasks")
+
+    completed_stmt = select(distinct(Submission.task_id)).where(
+        Submission.candidate_session_id == cs.id
+    )
+    completed_res = await db.execute(completed_stmt)
+    completed_task_ids = set(completed_res.scalars().all())
+
+    current_task = next(
+        (task for task in tasks if task.id not in completed_task_ids),
+        None,
+    )
+    is_complete = current_task is None
+
+    if is_complete and cs.status != "completed":
+        cs.status = "completed"
+        if cs.completed_at is None:
+            cs.completed_at = now
+        await db.commit()
+        await db.refresh(cs)
+
+    return CurrentTaskResponse(
+        candidateSessionId=cs.id,
+        status=cs.status,
+        currentDayIndex=None if is_complete else current_task.day_index,
+        currentTask=(
+            None
+            if is_complete
+            else TaskPublic(
+                id=current_task.id,
+                dayIndex=current_task.day_index,
+                title=current_task.title,
+                type=current_task.type,
+                description=current_task.description,
+            )
+        ),
+        completedTaskIds=sorted(completed_task_ids),
+        progress=ProgressSummary(
+            completed=len(completed_task_ids),
+            total=len(tasks),
+        ),
+        isComplete=is_complete,
     )

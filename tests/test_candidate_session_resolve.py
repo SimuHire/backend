@@ -5,16 +5,18 @@ from sqlalchemy import select
 
 from app.models.candidate_session import CandidateSession
 from app.models.company import Company
+from app.models.submission import Submission
+from app.models.task import Task
 from app.models.user import User
+
+# -------------------------
+# Shared helpers (mirrors resolve tests)
+# -------------------------
 
 
 async def _seed_recruiter(
     async_session, email: str = "recruiter1@simuhire.com"
 ) -> User:
-    """
-    Tests authenticate via x-dev-user-email and conftest override looks up the User in DB.
-    So we must seed a recruiter user (and company) before calling recruiter-auth endpoints.
-    """
     company = Company(name="TestCo")
     async_session.add(company)
     await async_session.commit()
@@ -34,74 +36,46 @@ async def _seed_recruiter(
 
 
 async def _create_simulation(async_client, recruiter_email: str) -> int:
-    """
-    Be tolerant to possible field naming differences (snake_case vs camelCase).
-    """
-    payload_snake = {
+    payload = {
         "title": "Backend Node Simulation",
         "role": "Backend Engineer",
-        "tech_stack": "Node.js, PostgreSQL",
+        "techStack": "Node.js, PostgreSQL",
         "seniority": "Mid",
         "focus": "Build new API feature and debug an issue",
     }
     res = await async_client.post(
         "/api/simulations",
-        json=payload_snake,
+        json=payload,
         headers={"x-dev-user-email": recruiter_email},
     )
-
-    if res.status_code == 422:
-        payload_camel = {
-            "title": "Backend Node Simulation",
-            "role": "Backend Engineer",
-            "techStack": "Node.js, PostgreSQL",
-            "seniority": "Mid",
-            "focus": "Build new API feature and debug an issue",
-        }
-        res = await async_client.post(
-            "/api/simulations",
-            json=payload_camel,
-            headers={"x-dev-user-email": recruiter_email},
-        )
-
     assert res.status_code in (200, 201), res.text
-    body = res.json()
-    assert "id" in body, body
-    return body["id"]
+    return res.json()["id"]
 
 
 async def _invite_candidate(async_client, sim_id: int, recruiter_email: str) -> dict:
-    """
-    Be tolerant to possible field naming differences.
-    """
-    payload_camel = {"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"}
+    payload = {"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"}
     res = await async_client.post(
         f"/api/simulations/{sim_id}/invite",
-        json=payload_camel,
+        json=payload,
         headers={"x-dev-user-email": recruiter_email},
     )
-
-    if res.status_code == 422:
-        payload_snake = {
-            "candidate_name": "Jane Doe",
-            "invite_email": "jane@example.com",
-        }
-        res = await async_client.post(
-            f"/api/simulations/{sim_id}/invite",
-            json=payload_snake,
-            headers={"x-dev-user-email": recruiter_email},
-        )
-
     assert res.status_code == 201, res.text
-    body = res.json()
-    assert "token" in body and "candidateSessionId" in body, body
-    return body
+    return res.json()
+
+
+async def _resolve(async_client, token: str):
+    res = await async_client.get(f"/api/candidate/session/{token}")
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+# -------------------------
+# Tests
+# -------------------------
 
 
 @pytest.mark.asyncio
-async def test_resolve_valid_token_returns_metadata_and_updates_status(
-    async_client, async_session
-):
+async def test_current_task_initial_is_day_1(async_client, async_session):
     recruiter_email = "recruiter1@simuhire.com"
     await _seed_recruiter(async_session, recruiter_email)
 
@@ -111,65 +85,27 @@ async def test_resolve_valid_token_returns_metadata_and_updates_status(
     token = invite["token"]
     cs_id = invite["candidateSessionId"]
 
-    # Resolve token (first access)
-    res = await async_client.get(f"/api/candidate/session/{token}")
+    # Resolve once to start session
+    await _resolve(async_client, token)
+
+    res = await async_client.get(
+        f"/api/candidate/session/{cs_id}/current_task",
+        headers={"x-candidate-token": token},
+    )
     assert res.status_code == 200, res.text
     body = res.json()
 
     assert body["candidateSessionId"] == cs_id
-    assert body["status"] == "in_progress"
-    assert body["candidateName"] == "Jane Doe"
-    assert body["startedAt"] is not None
-    assert body["simulation"]["id"] == sim_id
-    assert body["simulation"]["title"] == "Backend Node Simulation"
-    assert body["simulation"]["role"] == "Backend Engineer"
-
-    # Confirm DB updated
-    row = (
-        await async_session.execute(
-            select(CandidateSession).where(CandidateSession.id == cs_id)
-        )
-    ).scalar_one()
-    assert row.status == "in_progress"
-    assert row.started_at is not None
+    assert body["isComplete"] is False
+    assert body["currentDayIndex"] == 1
+    assert body["currentTask"]["dayIndex"] == 1
+    assert body["progress"]["completed"] == 0
+    assert body["progress"]["total"] == 5
+    assert body["currentTask"]["description"]
 
 
 @pytest.mark.asyncio
-async def test_resolve_token_is_idempotent_started_at_does_not_change(
-    async_client, async_session
-):
-    recruiter_email = "recruiter1@simuhire.com"
-    await _seed_recruiter(async_session, recruiter_email)
-
-    sim_id = await _create_simulation(async_client, recruiter_email)
-    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
-
-    token = invite["token"]
-
-    r1 = await async_client.get(f"/api/candidate/session/{token}")
-    assert r1.status_code == 200, r1.text
-    started_1 = r1.json()["startedAt"]
-
-    r2 = await async_client.get(f"/api/candidate/session/{token}")
-    assert r2.status_code == 200, r2.text
-    started_2 = r2.json()["startedAt"]
-
-    assert started_1 == started_2
-
-
-@pytest.mark.asyncio
-async def test_resolve_invalid_token_404(async_client):
-    res = await async_client.get(
-        "/api/candidate/session/this-token-does-not-exist-1234567890"
-    )
-    assert res.status_code == 404
-    assert res.json()["detail"] == "Invalid invite token"
-
-
-@pytest.mark.asyncio
-async def test_resolve_completed_session_does_not_revert_status(
-    async_client, async_session
-):
+async def test_current_task_advances_after_submission(async_client, async_session):
     recruiter_email = "recruiter1@simuhire.com"
     await _seed_recruiter(async_session, recruiter_email)
 
@@ -179,31 +115,94 @@ async def test_resolve_completed_session_does_not_revert_status(
     token = invite["token"]
     cs_id = invite["candidateSessionId"]
 
-    # Resolve once to set started_at + in_progress
-    r1 = await async_client.get(f"/api/candidate/session/{token}")
-    assert r1.status_code == 200, r1.text
-    started_1 = r1.json()["startedAt"]
+    await _resolve(async_client, token)
 
-    # Force status to completed in DB
+    # Fetch Day 1 task
+    day1_task = (
+        await async_session.execute(
+            select(Task).where(Task.simulation_id == sim_id, Task.day_index == 1)
+        )
+    ).scalar_one()
+
+    # Insert submission for Day 1
+    submission = Submission(
+        candidate_session_id=cs_id,
+        task_id=day1_task.id,
+        submitted_at=datetime.now(UTC),
+        content_text="My design solution",
+    )
+    async_session.add(submission)
+    await async_session.commit()
+
+    res = await async_client.get(
+        f"/api/candidate/session/{cs_id}/current_task",
+        headers={"x-candidate-token": token},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+
+    assert body["currentDayIndex"] == 2
+    assert body["progress"]["completed"] == 1
+    assert body["currentTask"]["dayIndex"] == 2
+
+
+@pytest.mark.asyncio
+async def test_current_task_completed_after_all_tasks(async_client, async_session):
+    recruiter_email = "recruiter1@simuhire.com"
+    await _seed_recruiter(async_session, recruiter_email)
+
+    sim_id = await _create_simulation(async_client, recruiter_email)
+    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+
+    token = invite["token"]
+    cs_id = invite["candidateSessionId"]
+
+    await _resolve(async_client, token)
+
+    tasks = (
+        (await async_session.execute(select(Task).where(Task.simulation_id == sim_id)))
+        .scalars()
+        .all()
+    )
+
+    now = datetime.now(UTC)
+
+    for task in tasks:
+        async_session.add(
+            Submission(
+                candidate_session_id=cs_id,
+                task_id=task.id,
+                submitted_at=now,
+                content_text="done",
+            )
+        )
+
+    await async_session.commit()
+
+    res = await async_client.get(
+        f"/api/candidate/session/{cs_id}/current_task",
+        headers={"x-candidate-token": token},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+
+    assert body["isComplete"] is True
+    assert body["currentTask"] is None
+    assert body["currentDayIndex"] is None
+
+    # DB state updated
     cs = (
         await async_session.execute(
             select(CandidateSession).where(CandidateSession.id == cs_id)
         )
     ).scalar_one()
-    cs.status = "completed"
-    await async_session.commit()
 
-    # Resolve again should keep completed and preserve startedAt
-    r2 = await async_client.get(f"/api/candidate/session/{token}")
-    assert r2.status_code == 200, r2.text
-    body = r2.json()
-
-    assert body["status"] == "completed"
-    assert body["startedAt"] == started_1
+    assert cs.status == "completed"
+    assert cs.completed_at is not None
 
 
 @pytest.mark.asyncio
-async def test_resolve_expired_token_410(async_client, async_session):
+async def test_current_task_wrong_token_404(async_client, async_session):
     recruiter_email = "recruiter1@simuhire.com"
     await _seed_recruiter(async_session, recruiter_email)
 
@@ -213,7 +212,28 @@ async def test_resolve_expired_token_410(async_client, async_session):
     token = invite["token"]
     cs_id = invite["candidateSessionId"]
 
-    # Force expiry in DB
+    await _resolve(async_client, token)
+
+    res = await async_client.get(
+        f"/api/candidate/session/{cs_id}/current_task",
+        headers={"x-candidate-token": "wrong-token"},
+    )
+    assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_current_task_expired_token_410(async_client, async_session):
+    recruiter_email = "recruiter1@simuhire.com"
+    await _seed_recruiter(async_session, recruiter_email)
+
+    sim_id = await _create_simulation(async_client, recruiter_email)
+    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+
+    token = invite["token"]
+    cs_id = invite["candidateSessionId"]
+
+    await _resolve(async_client, token)
+
     cs = (
         await async_session.execute(
             select(CandidateSession).where(CandidateSession.id == cs_id)
@@ -223,6 +243,9 @@ async def test_resolve_expired_token_410(async_client, async_session):
     cs.expires_at = datetime.now(UTC) - timedelta(seconds=1)
     await async_session.commit()
 
-    res = await async_client.get(f"/api/candidate/session/{token}")
-    assert res.status_code == 410, res.text
+    res = await async_client.get(
+        f"/api/candidate/session/{cs_id}/current_task",
+        headers={"x-candidate-token": token},
+    )
+    assert res.status_code == 410
     assert res.json()["detail"] == "Invite token expired"
