@@ -249,3 +249,60 @@ async def test_current_task_expired_token_410(async_client, async_session):
     )
     assert res.status_code == 410
     assert res.json()["detail"] == "Invite token expired"
+
+
+@pytest.mark.asyncio
+async def test_resolve_transitions_to_in_progress(async_client, async_session):
+    recruiter_email = "recruiter1@simuhire.com"
+    await _seed_recruiter(async_session, recruiter_email)
+
+    sim_id = await _create_simulation(async_client, recruiter_email)
+    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+
+    token = invite["token"]
+    cs_id = invite["candidateSessionId"]
+
+    res = await async_client.get(f"/api/candidate/session/{token}")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["status"] == "in_progress"
+    assert body["startedAt"] is not None
+
+    cs_after = (
+        await async_session.execute(
+            select(CandidateSession).where(CandidateSession.id == cs_id)
+        )
+    ).scalar_one()
+    assert cs_after.status == "in_progress"
+    assert cs_after.started_at is not None
+
+
+@pytest.mark.asyncio
+async def test_resolve_expired_token_returns_410(async_client, async_session):
+    recruiter_email = "recruiter1@simuhire.com"
+    await _seed_recruiter(async_session, recruiter_email)
+
+    sim_id = await _create_simulation(async_client, recruiter_email)
+    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+
+    token = invite["token"]
+    cs_id = invite["candidateSessionId"]
+
+    cs = (
+        await async_session.execute(
+            select(CandidateSession).where(CandidateSession.id == cs_id)
+        )
+    ).scalar_one()
+    cs.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    await async_session.commit()
+
+    res = await async_client.get(f"/api/candidate/session/{token}")
+    assert res.status_code == 410
+    assert res.json()["detail"] == "Invite token expired"
+
+
+@pytest.mark.asyncio
+async def test_resolve_invalid_token_returns_404(async_client):
+    res = await async_client.get("/api/candidate/session/invalid-token-1234567890")
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Invalid invite token"

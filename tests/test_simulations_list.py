@@ -165,3 +165,33 @@ async def test_list_simulations_does_not_show_other_users(authed_client, async_s
     assert resp.status_code == 200
     titles = {x["title"] for x in resp.json()}
     assert "Other User Sim" not in titles
+
+
+@pytest.mark.asyncio
+async def test_list_simulations_forbidden_for_non_recruiter(
+    async_client, async_session
+):
+    company = Company(name="CandidateCo")
+    async_session.add(company)
+    await async_session.flush()
+
+    candidate_user = User(
+        name="Candidate User",
+        email="candidate@test.com",
+        role="candidate",
+        company_id=company.id,
+        password_hash=None,
+    )
+    async_session.add(candidate_user)
+    await async_session.commit()
+
+    def override_user():
+        return candidate_user
+
+    app.dependency_overrides[get_current_user] = override_user
+    try:
+        resp = await async_client.get("/api/simulations")
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "Recruiter access required"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

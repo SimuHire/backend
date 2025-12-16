@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.candidate_session import CandidateSession
 from app.models.company import Company
 from app.models.submission import Submission
 from app.models.user import User
@@ -273,3 +274,132 @@ async def test_duplicate_submission_409(
         json={"contentText": "second"},
     )
     assert r2.status_code == 409, r2.text
+
+
+@pytest.mark.asyncio
+async def test_text_submission_requires_content(
+    async_client, async_session: AsyncSession, monkeypatch
+):
+    monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
+
+    recruiter_email = "recruiterA@simuhire.com"
+    await seed_recruiter(
+        async_session, email=recruiter_email, company_name="Recruiter A"
+    )
+
+    sim = await create_simulation(async_client, recruiter_email)
+    invite = await invite_candidate(async_client, sim["id"], recruiter_email)
+    token = invite["token"]
+    cs_id = (await resolve_session(async_client, token))["candidateSessionId"]
+
+    current = await get_current_task(async_client, cs_id, token)
+    task_id = current["currentTask"]["id"]
+
+    res = await async_client.post(
+        f"/api/tasks/{task_id}/submit",
+        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        json={"contentText": "   "},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "contentText is required"
+
+
+@pytest.mark.asyncio
+async def test_code_submission_requires_code_or_files(
+    async_client, async_session: AsyncSession, monkeypatch
+):
+    monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
+
+    recruiter_email = "recruiterA@simuhire.com"
+    await seed_recruiter(
+        async_session, email=recruiter_email, company_name="Recruiter A"
+    )
+
+    sim = await create_simulation(async_client, recruiter_email)
+    invite = await invite_candidate(async_client, sim["id"], recruiter_email)
+    token = invite["token"]
+    cs_id = (await resolve_session(async_client, token))["candidateSessionId"]
+
+    # Complete day 1 (text) to advance to day 2 (code)
+    day1 = await get_current_task(async_client, cs_id, token)
+    day1_task_id = day1["currentTask"]["id"]
+    ok = await async_client.post(
+        f"/api/tasks/{day1_task_id}/submit",
+        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        json={"contentText": "design answer"},
+    )
+    assert ok.status_code == 201, ok.text
+
+    day2 = await get_current_task(async_client, cs_id, token)
+    assert day2["currentDayIndex"] == 2
+    day2_task_id = day2["currentTask"]["id"]
+
+    res = await async_client.post(
+        f"/api/tasks/{day2_task_id}/submit",
+        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        json={"contentText": "but no code"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "codeBlob or files is required"
+
+
+@pytest.mark.asyncio
+async def test_submitting_all_tasks_marks_session_complete(
+    async_client, async_session: AsyncSession, monkeypatch
+):
+    monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
+
+    recruiter_email = "recruiterA@simuhire.com"
+    await seed_recruiter(
+        async_session, email=recruiter_email, company_name="Recruiter A"
+    )
+
+    sim = await create_simulation(async_client, recruiter_email)
+    invite = await invite_candidate(async_client, sim["id"], recruiter_email)
+    token = invite["token"]
+    cs_id = (await resolve_session(async_client, token))["candidateSessionId"]
+
+    payloads_by_day = {
+        1: {"contentText": "day1 design"},
+        2: {"codeBlob": "console.log('day2');"},
+        3: {"codeBlob": "console.log('day3');"},
+        4: {"contentText": "handoff notes"},
+        5: {"contentText": "documentation"},
+    }
+
+    last_response = None
+    for day_index in range(1, 6):
+        current = await get_current_task(async_client, cs_id, token)
+        assert current["currentDayIndex"] == day_index
+        task_id = current["currentTask"]["id"]
+
+        last_response = await async_client.post(
+            f"/api/tasks/{task_id}/submit",
+            headers={
+                "x-candidate-token": token,
+                "x-candidate-session-id": str(cs_id),
+            },
+            json=payloads_by_day[day_index],
+        )
+        assert last_response.status_code == 201, last_response.text
+
+    assert last_response is not None
+    body = last_response.json()
+    assert body["isComplete"] is True
+    assert body["progress"]["completed"] == 5
+    assert body["progress"]["total"] == 5
+
+    cs = (
+        await async_session.execute(
+            select(Submission.candidate_session_id, Submission.id)
+        )
+    ).scalars()
+    assert len(list(cs)) == 5
+
+    cs_row = (
+        await async_session.execute(
+            select(CandidateSession).where(CandidateSession.id == cs_id)
+        )
+    ).scalar_one()
+    assert cs_row.status == "completed"
+    assert cs_row.completed_at is not None
