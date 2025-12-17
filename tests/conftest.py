@@ -19,7 +19,7 @@ async def async_session():
     async with engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE companies, users, simulations, tasks, candidate_sessions, submissions "
+                "TRUNCATE companies, users, simulations, tasks, candidate_sessions, submissions, execution_profiles "
                 "RESTART IDENTITY CASCADE"
             )
         )

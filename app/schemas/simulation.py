@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 TaskType = Literal["design", "code", "debug", "handoff", "documentation"]
 
@@ -21,19 +21,18 @@ class SimulationCreate(BaseModel):
 class TaskOut(BaseModel):
     """Response model for a created task."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     day_index: int
     type: TaskType
     title: str = Field(..., min_length=1, max_length=200)
 
-    class Config:
-        """Pydantic configuration."""
-
-        from_attributes = True
-
 
 class SimulationCreateResponse(BaseModel):
     """Response returned after creating a simulation."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     title: str
@@ -43,14 +42,11 @@ class SimulationCreateResponse(BaseModel):
     focus: str
     tasks: list[TaskOut]
 
-    class Config:
-        """Pydantic configuration."""
-
-        from_attributes = True
-
 
 class SimulationListItem(BaseModel):
     """List item for recruiter dashboard simulations."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     title: str
@@ -58,8 +54,3 @@ class SimulationListItem(BaseModel):
     techStack: str
     createdAt: datetime
     numCandidates: int
-
-    class Config:
-        """Pydantic configuration."""
-
-        from_attributes = True

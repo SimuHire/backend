@@ -1,8 +1,11 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.task import TaskPublic
+
+CandidateSessionStatus = Literal["not_started", "in_progress", "completed", "expired"]
 
 
 class CandidateInviteRequest(BaseModel):
@@ -56,3 +59,15 @@ class CurrentTaskResponse(BaseModel):
     completedTaskIds: list[int]
     progress: ProgressSummary
     isComplete: bool
+
+
+class CandidateSessionListItem(BaseModel):
+    """Schema for listing candidate sessions."""
+
+    candidateSessionId: int
+    inviteEmail: EmailStr
+    candidateName: str
+    status: CandidateSessionStatus
+    startedAt: datetime | None
+    completedAt: datetime | None
+    hasReport: bool
