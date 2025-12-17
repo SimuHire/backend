@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import os
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db import async_session_maker
+from app.db import async_session_maker, get_session
 from app.models.user import User
 from app.security import auth0
 
@@ -21,7 +23,8 @@ def _env_name() -> str:
 
 async def get_current_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),  # noqa: B008
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: Annotated[AsyncSession, Depends(get_session)],
 ) -> User:
     """Return the current user, creating them on first login.
 
@@ -31,7 +34,16 @@ async def get_current_user(
       - AND ENV=local
       - AND request comes from 127.0.0.1 / ::1
     """
-    dev_email = request.headers.get("x-dev-user-email")
+    dev_email = (request.headers.get("x-dev-user-email") or "").strip().lower()
+    if dev_email and settings.ENV in ("local", "test"):
+        result = await db.execute(select(User).where(User.email == dev_email))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Dev user not found: {dev_email}",
+            )
+        return user
 
     # -------------------------
     # LOCAL DEV AUTH BYPASS

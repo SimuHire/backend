@@ -49,3 +49,10 @@ class CandidateSession(Base):
         back_populates="candidate_session",
         cascade="all, delete-orphan",
     )
+
+    execution_profile = relationship(
+        "ExecutionProfile",
+        back_populates="candidate_session",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

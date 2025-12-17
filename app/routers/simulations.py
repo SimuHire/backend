@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_session
 from app.models.candidate_session import CandidateSession
+from app.models.execution_profile import ExecutionProfile
 from app.models.simulation import Simulation
 from app.models.task import Task
 from app.schemas.candidate_session import (
     CandidateInviteRequest,
     CandidateInviteResponse,
+    CandidateSessionListItem,
 )
 from app.schemas.simulation import (
     SimulationCreate,
@@ -192,3 +194,52 @@ async def create_candidate_invite(
             await db.rollback()
 
     raise HTTPException(status_code=500, detail="Failed to generate invite token")
+
+
+@router.get(
+    "/{simulation_id}/candidates",
+    response_model=list[CandidateSessionListItem],
+    status_code=status.HTTP_200_OK,
+)
+async def list_simulation_candidates(
+    simulation_id: int,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[Any, Depends(get_current_user)],
+):
+    """List candidate sessions for a simulation (recruiter-only)."""
+    if getattr(user, "role", None) not in (None, "recruiter"):
+        raise HTTPException(status_code=403, detail="Recruiter access required")
+
+    # Match existing ownership model (same as invite)
+    sim_stmt = select(Simulation).where(
+        Simulation.id == simulation_id,
+        Simulation.created_by == user.id,
+    )
+    sim = (await db.execute(sim_stmt)).scalar_one_or_none()
+    if sim is None:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    stmt = (
+        select(CandidateSession, ExecutionProfile.id)
+        .outerjoin(
+            ExecutionProfile,
+            ExecutionProfile.candidate_session_id == CandidateSession.id,
+        )
+        .where(CandidateSession.simulation_id == simulation_id)
+        .order_by(CandidateSession.id.desc())
+    )
+
+    rows = (await db.execute(stmt)).all()
+
+    return [
+        CandidateSessionListItem(
+            candidateSessionId=cs.id,
+            inviteEmail=cs.invite_email,
+            candidateName=cs.candidate_name,
+            status=cs.status,
+            startedAt=cs.started_at,
+            completedAt=cs.completed_at,
+            hasReport=(profile_id is not None),
+        )
+        for cs, profile_id in rows
+    ]
