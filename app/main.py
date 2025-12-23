@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, candidate, health, simulations, tasks
+from app.routers import auth, candidate, health, simulations, submissions, tasks
 
 
 def _parse_csv(value: str | None) -> list[str]:
@@ -72,6 +72,7 @@ def create_app() -> FastAPI:
         prefix=f"{settings.API_PREFIX}/tasks",
         tags=["tasks"],
     )
+    app.include_router(submissions.router)
 
     return app
 
