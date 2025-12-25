@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+import json
+
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -82,25 +84,30 @@ class AuthSettings(BaseSettings):
 class CorsSettings(BaseSettings):
     """CORS configuration."""
 
-    CORS_ALLOW_ORIGINS: list[str] = Field(default_factory=list)
+    CORS_ALLOW_ORIGINS: list[str] | str = Field(default_factory=list)
     CORS_ALLOW_ORIGIN_REGEX: str | None = None
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    @model_validator(mode="before")
+    @field_validator("CORS_ALLOW_ORIGINS", mode="before")
     @classmethod
-    def _coerce_origins(cls, data: dict) -> dict:
-        """Allow empty string or comma-separated CORS env values."""
-        if not isinstance(data, dict):
-            return data
-        raw = data.get("CORS_ALLOW_ORIGINS")
-        if raw in (None, "", [], ()):
-            data["CORS_ALLOW_ORIGINS"] = []
-            return data
-        if isinstance(raw, str):
-            parts = [p.strip() for p in raw.split(",") if p.strip()]
-            data["CORS_ALLOW_ORIGINS"] = parts
-        return data
+    def _coerce_origins(cls, value):
+        """Allow empty string, JSON array, or comma-separated CORS env values."""
+        if value in (None, "", [], (), "[]", "null", "None"):
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        return parsed
+                except json.JSONDecodeError:
+                    pass
+            return [p.strip() for p in text.split(",") if p.strip()]
+        return value
 
 
 class Settings(BaseSettings):
