@@ -15,6 +15,7 @@ from app.schemas.submission import (
     SubmissionCreateRequest,
     SubmissionCreateResponse,
 )
+from app.utils.progress import compute_current_task, summarize_progress
 
 router = APIRouter()
 
@@ -38,7 +39,11 @@ async def _load_candidate_session_or_404(
         raise HTTPException(status_code=404, detail="Candidate session not found")
 
     now = datetime.now(UTC)
-    if cs.expires_at is not None and cs.expires_at < now:
+    expires_at = cs.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+
+    if expires_at is not None and expires_at < now:
         raise HTTPException(status_code=410, detail="Invite token expired")
 
     return cs
@@ -62,7 +67,7 @@ async def _compute_current_task(db: AsyncSession, cs: CandidateSession) -> Task 
     completed_res = await db.execute(completed_stmt)
     completed_task_ids = set(completed_res.scalars().all())
 
-    return next((t for t in tasks if t.id not in completed_task_ids), None)
+    return compute_current_task(tasks, completed_task_ids)
 
 
 @router.post(
@@ -143,8 +148,8 @@ async def submit_task(
         Submission.candidate_session_id == cs.id
     )
     completed_res = await db.execute(completed_stmt)
-    completed = len(set(completed_res.scalars().all()))
-    is_complete = completed >= total and total > 0
+    completed_task_ids = set(completed_res.scalars().all())
+    completed, total, is_complete = summarize_progress(total, completed_task_ids)
 
     if is_complete and cs.status != "completed":
         cs.status = "completed"

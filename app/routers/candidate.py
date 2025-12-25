@@ -17,6 +17,7 @@ from app.schemas.candidate_session import (
     ProgressSummary,
 )
 from app.schemas.task import TaskPublic
+from app.utils.progress import compute_current_task, summarize_progress
 
 router = APIRouter()
 
@@ -45,7 +46,11 @@ async def resolve_candidate_session(
 
     now = datetime.now(UTC)
 
-    if cs.expires_at is not None and cs.expires_at < now:
+    expires_at = cs.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+
+    if expires_at is not None and expires_at < now:
         raise HTTPException(status_code=410, detail="Invite token expired")
 
     if cs.status == "not_started":
@@ -96,7 +101,11 @@ async def get_current_task(
 
     now = datetime.now(UTC)
 
-    if cs.expires_at is not None and cs.expires_at < now:
+    expires_at = cs.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+
+    if expires_at is not None and expires_at < now:
         raise HTTPException(status_code=410, detail="Invite token expired")
 
     tasks_stmt = (
@@ -116,11 +125,8 @@ async def get_current_task(
     completed_res = await db.execute(completed_stmt)
     completed_task_ids = set(completed_res.scalars().all())
 
-    current_task = next(
-        (task for task in tasks if task.id not in completed_task_ids),
-        None,
-    )
-    is_complete = current_task is None
+    current_task = compute_current_task(tasks, completed_task_ids)
+    completed, total, is_complete = summarize_progress(len(tasks), completed_task_ids)
 
     if is_complete and cs.status != "completed":
         cs.status = "completed"
@@ -145,9 +151,6 @@ async def get_current_task(
             )
         ),
         completedTaskIds=sorted(completed_task_ids),
-        progress=ProgressSummary(
-            completed=len(completed_task_ids),
-            total=len(tasks),
-        ),
+        progress=ProgressSummary(completed=completed, total=total),
         isComplete=is_complete,
     )

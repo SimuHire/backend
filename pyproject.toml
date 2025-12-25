@@ -37,7 +37,19 @@ pytest-asyncio = "^0.23.2"
 httpx = "^0.26.0"
 black = "^24.1.1"
 ruff = "^0.2.1"
+pytest-cov = "^4.1.0"
+hypothesis = "^6.98.0"
+aiosqlite = "^0.20.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+omit = ["app/models/core.py"]  # legacy models not used; conflicts with current ORM setup
+source = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=90"
