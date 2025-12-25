@@ -2,11 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.models.candidate_session import CandidateSession
-from app.models.company import Company
-from app.models.execution_profile import ExecutionProfile
-from app.models.simulation import Simulation
-from app.models.user import User
+from app.domain import CandidateSession, Company, ExecutionProfile, Simulation, User
 
 
 @pytest.mark.asyncio

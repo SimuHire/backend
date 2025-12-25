@@ -1,9 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.company import Company
-from app.models.simulation import Simulation
-from app.models.user import User
+from app.domain import Company, Simulation, User
 
 
 @pytest.mark.asyncio

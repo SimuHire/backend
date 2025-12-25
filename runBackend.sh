@@ -44,4 +44,4 @@ if [[ "${DISABLE_RELOAD:-0}" == "1" ]]; then
   RELOAD_FLAG=""
 fi
 
-$RUN uvicorn app.main:app ${RELOAD_FLAG} --host 0.0.0.0 --port 8000
+$RUN uvicorn app.api.main:app ${RELOAD_FLAG} --host 0.0.0.0 --port 8000

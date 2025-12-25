@@ -2,9 +2,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.db import get_session
+from app.core.db import get_session
+from app.core.security import auth0, current_user
 from app.main import app
-from app.security import auth0, current_user
 
 
 @pytest.mark.asyncio

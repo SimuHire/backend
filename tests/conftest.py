@@ -9,10 +9,10 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db import get_session
+from app.core.db import get_session
+from app.core.security.current_user import get_current_user
+from app.domain import Base, User
 from app.main import app
-from app.models import Base, User
-from app.security.current_user import get_current_user
 
 
 @pytest.fixture(scope="session")

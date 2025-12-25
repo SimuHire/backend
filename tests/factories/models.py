@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CandidateSession, Company, Simulation, Submission, Task, User
-from app.services.simulation_blueprint import DEFAULT_5_DAY_BLUEPRINT
+from app.domain import CandidateSession, Company, Simulation, Submission, Task, User
+from app.domain.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
 
 
 async def create_company(session: AsyncSession, *, name: str = "Acme Corp") -> Company:

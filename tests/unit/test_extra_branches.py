@@ -3,10 +3,12 @@ from fastapi import HTTPException
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 
-from app.models.task import Task
-from app.routers import candidate, simulations, submissions, tasks
-from app.schemas.simulation import SimulationCreate
-from app.security import current_user
+from app.api.routes.candidate import sessions as candidate
+from app.api.routes.candidate import submissions as tasks
+from app.api.routes.recruiter import simulations, submissions
+from app.core.security import current_user
+from app.domain import Task
+from app.domain.simulations.schemas import SimulationCreate
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

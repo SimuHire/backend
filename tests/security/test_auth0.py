@@ -2,7 +2,7 @@ import pytest
 from jose import jwt
 from jose.exceptions import JWTError
 
-from app.security import auth0
+from app.core.security import auth0
 
 
 def test_decode_auth0_token_invalid_header(monkeypatch):

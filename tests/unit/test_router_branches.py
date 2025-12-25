@@ -4,10 +4,12 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from starlette.requests import Request
 
-from app.routers import candidate, simulations, submissions, tasks
-from app.schemas.candidate_session import CandidateInviteRequest
-from app.schemas.submission import SubmissionCreateRequest
-from app.security import auth0, current_user
+from app.api.routes.candidate import sessions as candidate
+from app.api.routes.candidate import submissions as tasks
+from app.api.routes.recruiter import simulations, submissions
+from app.core.security import auth0, current_user
+from app.domain.candidate_sessions.schemas import CandidateInviteRequest
+from app.domain.submissions.schemas import SubmissionCreateRequest
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

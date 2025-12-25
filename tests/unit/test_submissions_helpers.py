@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from app.routers import submissions
+from app.api.routes.recruiter import submissions
 from tests.factories import create_recruiter
 
 

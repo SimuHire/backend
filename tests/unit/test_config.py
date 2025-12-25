@@ -1,6 +1,6 @@
 import pytest
 
-from app.config import Settings
+from app.core.config import Settings
 
 
 def test_database_url_sync_normalizes_postgres_scheme():

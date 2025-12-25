@@ -1,9 +1,8 @@
 import pytest
 
+from app.core.security.current_user import get_current_user
+from app.domain import Company, User
 from app.main import app
-from app.models.company import Company
-from app.models.user import User
-from app.security.current_user import get_current_user
 
 
 @pytest.mark.asyncio
