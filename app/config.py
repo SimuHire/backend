@@ -87,6 +87,21 @@ class CorsSettings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_origins(cls, data: dict) -> dict:
+        """Allow empty string or comma-separated CORS env values."""
+        if not isinstance(data, dict):
+            return data
+        raw = data.get("CORS_ALLOW_ORIGINS")
+        if raw in (None, "", [], ()):
+            data["CORS_ALLOW_ORIGINS"] = []
+            return data
+        if isinstance(raw, str):
+            parts = [p.strip() for p in raw.split(",") if p.strip()]
+            data["CORS_ALLOW_ORIGINS"] = parts
+        return data
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and `.env`."""
