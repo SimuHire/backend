@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.domain.common.base import APIModel
 
@@ -13,6 +13,33 @@ class SubmissionCreateRequest(BaseModel):
     contentText: str | None = Field(default=None)
     codeBlob: str | None = Field(default=None)
     files: dict[str, str] | None = Field(default=None)
+
+
+class RunTestsRequest(BaseModel):
+    """Schema for executing sandbox tests."""
+
+    codeBlob: str | None = Field(default=None)
+    files: dict[str, str] | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _validate_has_payload(self) -> RunTestsRequest:
+        code_blob = self.codeBlob
+        files = self.files
+        if (code_blob is None or str(code_blob).strip() == "") and not files:
+            raise ValueError("codeBlob or files is required")
+        return self
+
+
+class RunTestsResponse(APIModel):
+    """Schema for sandbox run response."""
+
+    status: str
+    passed: int
+    failed: int
+    total: int
+    stdout: str | None = None
+    stderr: str | None = None
+    timeout: bool = False
 
 
 class ProgressSummary(APIModel):

@@ -111,6 +111,18 @@ class CorsSettings(BaseSettings):
         return value
 
 
+class SandboxSettings(BaseSettings):
+    """Sandbox client configuration."""
+
+    SANDBOX_API_URL: str = "http://sandbox"
+    SANDBOX_API_KEY: str = ""
+    SANDBOX_TIMEOUT_SECONDS: float = 30.0
+    SANDBOX_POLL_INTERVAL_SECONDS: float = 0.5
+    SANDBOX_MAX_POLL_SECONDS: float = 20.0
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and `.env`."""
 
@@ -140,6 +152,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
+    sandbox: SandboxSettings = Field(default_factory=SandboxSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
 
@@ -157,6 +170,13 @@ class Settings(BaseSettings):
             "AUTH0_ALGORITHMS",
         }
         cors_keys = {"CORS_ALLOW_ORIGINS", "CORS_ALLOW_ORIGIN_REGEX"}
+        sandbox_keys = {
+            "SANDBOX_API_URL",
+            "SANDBOX_API_KEY",
+            "SANDBOX_TIMEOUT_SECONDS",
+            "SANDBOX_POLL_INTERVAL_SECONDS",
+            "SANDBOX_MAX_POLL_SECONDS",
+        }
 
         db_data = dict(data.get("database", {}) or {})
         for key in db_keys:
@@ -184,6 +204,15 @@ class Settings(BaseSettings):
                 cors_data[key] = env_val
         if cors_data:
             data["cors"] = cors_data
+
+        sandbox_data = dict(data.get("sandbox", {}) or {})
+        for key in sandbox_keys:
+            if key in data:
+                sandbox_data[key] = data.pop(key)
+            elif (env_val := os.getenv(key)) is not None:
+                sandbox_data[key] = env_val
+        if sandbox_data:
+            data["sandbox"] = sandbox_data
 
         return data
 

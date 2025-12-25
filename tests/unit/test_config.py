@@ -39,3 +39,19 @@ def test_auth0_helpers_default_to_domain():
     assert s.auth0_issuer == "https://example.auth0.com/"
     assert s.auth0_jwks_url == "https://example.auth0.com/.well-known/jwks.json"
     assert s.auth0_algorithms == ["RS256", "HS256"]
+
+
+def test_sandbox_settings_merge_flat_env():
+    s = Settings(
+        SANDBOX_API_URL="http://sandbox",
+        SANDBOX_API_KEY="token123",
+        SANDBOX_TIMEOUT_SECONDS="15",
+        SANDBOX_POLL_INTERVAL_SECONDS="0.2",
+        SANDBOX_MAX_POLL_SECONDS="5",
+    )
+
+    assert s.sandbox.SANDBOX_API_URL == "http://sandbox"
+    assert s.sandbox.SANDBOX_API_KEY == "token123"
+    assert float(s.sandbox.SANDBOX_TIMEOUT_SECONDS) == 15.0
+    assert float(s.sandbox.SANDBOX_POLL_INTERVAL_SECONDS) == 0.2
+    assert float(s.sandbox.SANDBOX_MAX_POLL_SECONDS) == 5.0

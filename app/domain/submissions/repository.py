@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import Submission
+from app.domain import Simulation, Submission
 
 
 async def find_duplicate(
@@ -16,3 +16,17 @@ async def find_duplicate(
     )
     dup_res = await db.execute(dup_stmt)
     return dup_res.scalar_one_or_none() is not None
+
+
+async def simulation_template(db: AsyncSession, simulation_id: int) -> str | None:
+    """Return a stable scenario key for a simulation."""
+    stmt = select(
+        Simulation.scenario_template,
+        Simulation.focus,
+    ).where(Simulation.id == simulation_id)
+    res = await db.execute(stmt)
+    row = res.first()
+    if not row:
+        return None
+    scenario_template, focus = row
+    return scenario_template or focus

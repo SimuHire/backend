@@ -80,6 +80,58 @@ def validate_payload(task: Task, payload) -> None:
         )
 
 
+def validate_run_payload(task: Task, payload) -> None:
+    """Validate sandbox run payload for code/debug tasks."""
+    task_type = (task.type or "").lower()
+    if task_type not in CODE_TASK_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Run tests is only available for code tasks",
+        )
+    has_code_blob = bool(payload.codeBlob and payload.codeBlob.strip())
+    has_files = bool(payload.files)
+    if not (has_code_blob or has_files):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="codeBlob or files is required",
+        )
+
+
+async def build_task_ref(db: AsyncSession, task: Task) -> str:
+    """Derive a stable task reference for sandbox bundles."""
+    scenario = await submissions_repo.simulation_template(db, task.simulation_id)
+    scenario_prefix = (scenario or "default").strip().replace(" ", "-").lower()
+    task_type = (task.type or "task").strip().lower()
+
+    day_value = None
+    for attr in ("day_index", "day", "day_number"):
+        if hasattr(task, attr):
+            val = getattr(task, attr, None)
+            if val is not None:
+                day_value = int(val)
+                break
+    if day_value is None:
+        for attr in ("order", "position", "sequence"):
+            if hasattr(task, attr):
+                val = getattr(task, attr, None)
+                if val is not None:
+                    day_value = int(val)
+                    break
+
+    derived_default = False
+    if day_value is None:
+        day_value = 1
+        derived_default = True
+
+    if not derived_default and 0 <= day_value <= 4:
+        day_value += 1
+    if day_value <= 0:
+        day_value = 1
+    day_part = f"day{day_value}"
+
+    return f"{scenario_prefix}-{day_part}-{task_type}"
+
+
 async def create_submission(
     db: AsyncSession,
     candidate_session: CandidateSession,
