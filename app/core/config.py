@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -116,12 +117,25 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",
+        extra="allow",
         env_nested_delimiter="__",
     )
 
     ENV: str = "local"
     API_PREFIX: str = "/api"
+
+    # Flat env hooks (loaded from .env and merged into nested models)
+    DATABASE_URL: str | None = None
+    DATABASE_URL_SYNC: str | None = None
+
+    AUTH0_DOMAIN: str | None = None
+    AUTH0_ISSUER: str | None = None
+    AUTH0_JWKS_URL: str | None = None
+    AUTH0_API_AUDIENCE: str | None = None
+    AUTH0_ALGORITHMS: str | None = None
+
+    CORS_ALLOW_ORIGINS: str | list[str] | None = None
+    CORS_ALLOW_ORIGIN_REGEX: str | None = None
 
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
@@ -148,6 +162,8 @@ class Settings(BaseSettings):
         for key in db_keys:
             if key in data:
                 db_data[key] = data.pop(key)
+            elif (env_val := os.getenv(key)) is not None:
+                db_data[key] = env_val
         if db_data:
             data["database"] = db_data
 
@@ -155,6 +171,8 @@ class Settings(BaseSettings):
         for key in auth_keys:
             if key in data:
                 auth_data[key] = data.pop(key)
+            elif (env_val := os.getenv(key)) is not None:
+                auth_data[key] = env_val
         if auth_data:
             data["auth"] = auth_data
 
@@ -162,6 +180,8 @@ class Settings(BaseSettings):
         for key in cors_keys:
             if key in data:
                 cors_data[key] = data.pop(key)
+            elif (env_val := os.getenv(key)) is not None:
+                cors_data[key] = env_val
         if cors_data:
             data["cors"] = cors_data
 
@@ -197,25 +217,5 @@ class Settings(BaseSettings):
     def auth0_algorithms(self) -> list[str]:  # pragma: no cover - shim
         """Backward-compatible Auth0 algorithms getter."""
         return self.auth.algorithms
-
-    @property
-    def CORS_ALLOW_ORIGINS(self) -> list[str]:  # pragma: no cover - shim
-        """Backward-compatible CORS allow origins list."""
-        return self.cors.CORS_ALLOW_ORIGINS
-
-    @property
-    def CORS_ALLOW_ORIGIN_REGEX(self) -> str | None:  # pragma: no cover - shim
-        """Backward-compatible CORS allow origin regex."""
-        return self.cors.CORS_ALLOW_ORIGIN_REGEX
-
-    @property
-    def AUTH0_JWKS_URL(self) -> str | None:  # pragma: no cover - shim
-        """Backward-compatible direct access to Auth0 JWKS URL."""
-        return self.auth.AUTH0_JWKS_URL
-
-    @AUTH0_JWKS_URL.setter
-    def AUTH0_JWKS_URL(self, value: str | None) -> None:  # pragma: no cover - shim
-        self.auth.AUTH0_JWKS_URL = value
-
 
 settings = Settings()
