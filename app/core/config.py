@@ -218,4 +218,20 @@ class Settings(BaseSettings):
         """Backward-compatible Auth0 algorithms getter."""
         return self.auth.algorithms
 
+    def __getattr__(self, name: str):
+        """Backwards-compatible passthrough for legacy flat settings."""
+        if name == "AUTH0_JWKS_URL":
+            return self.auth.AUTH0_JWKS_URL
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
+
+    def __setattr__(self, name: str, value):
+        """Allow tests/dev code to set AUTH0_JWKS_URL directly on settings."""
+        if name == "AUTH0_JWKS_URL":
+            self.auth.AUTH0_JWKS_URL = value
+            return
+        super().__setattr__(name, value)
+
+
 settings = Settings()
