@@ -15,6 +15,11 @@ from app.domain.candidate_sessions.schemas import CandidateInviteRequest
 from app.domain.simulations import repository as sim_repo
 from app.domain.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
 
+DEFAULT_TEMPLATE_REPOS = {
+    2: "simuhire-templates/node-day2-api",
+    3: "simuhire-templates/node-day3-debug",
+}
+
 INVITE_TOKEN_TTL_DAYS = 14
 
 
@@ -54,12 +59,14 @@ async def create_simulation_with_tasks(
 
     created_tasks: list[Task] = []
     for t in DEFAULT_5_DAY_BLUEPRINT:
+        template_repo = _template_repo_for_task(t["day_index"], t["type"])
         task = Task(
             simulation_id=sim.id,
             day_index=t["day_index"],
             type=t["type"],
             title=t["title"],
             description=t["description"],
+            template_repo=template_repo,
         )
         db.add(task)
         created_tasks.append(task)
@@ -72,6 +79,22 @@ async def create_simulation_with_tasks(
 
     created_tasks.sort(key=lambda x: x.day_index)
     return sim, created_tasks
+
+
+def _template_repo_for_task(day_index: int, task_type: str) -> str | None:
+    """Resolve a template repo for a seeded task."""
+    task_type = (task_type or "").lower()
+    if task_type not in {"code", "debug"}:
+        return None
+
+    repo = DEFAULT_TEMPLATE_REPOS.get(day_index)
+    if not repo:
+        return None
+
+    # Allow overriding owner via env when repo name is provided without owner.
+    if "/" not in repo and settings.github.GITHUB_TEMPLATE_OWNER:
+        return f"{settings.github.GITHUB_TEMPLATE_OWNER}/{repo}"
+    return repo
 
 
 async def create_invite(

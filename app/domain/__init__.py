@@ -6,6 +6,7 @@ from app.domain.simulations.task import Task
 from app.domain.submissions.execution_profile import ExecutionProfile
 from app.domain.submissions.submission import Submission
 from app.domain.users.models import User
+from app.domain.workspaces.workspace import Workspace
 
 __all__ = [
     "Base",
@@ -16,5 +17,6 @@ __all__ = [
     "Task",
     "Submission",
     "ExecutionProfile",
+    "Workspace",
     "User",
 ]

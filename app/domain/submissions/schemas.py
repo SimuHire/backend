@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from app.domain.common.base import APIModel
 
@@ -11,35 +12,61 @@ class SubmissionCreateRequest(BaseModel):
     """Schema for creating a submission."""
 
     contentText: str | None = Field(default=None)
-    codeBlob: str | None = Field(default=None)
-    files: dict[str, str] | None = Field(default=None)
+    branch: str | None = Field(default=None)
+    workflowInputs: dict[str, Any] | None = Field(default=None)
+    # Code tasks are GitHub-native; code payload is no longer accepted.
 
 
 class RunTestsRequest(BaseModel):
-    """Schema for executing sandbox tests."""
+    """Schema for executing GitHub Actions tests."""
 
-    codeBlob: str | None = Field(default=None)
-    files: dict[str, str] | None = Field(default=None)
-
-    @model_validator(mode="after")
-    def _validate_has_payload(self) -> RunTestsRequest:
-        code_blob = self.codeBlob
-        files = self.files
-        if (code_blob is None or str(code_blob).strip() == "") and not files:
-            raise ValueError("codeBlob or files is required")
-        return self
+    workflowInputs: dict[str, Any] | None = Field(default=None)
+    branch: str | None = Field(default=None)
 
 
 class RunTestsResponse(APIModel):
-    """Schema for sandbox run response."""
+    """Schema for Actions run response."""
 
     status: str
-    passed: int
-    failed: int
-    total: int
+    passed: int | None = None
+    failed: int | None = None
+    total: int | None = None
     stdout: str | None = None
     stderr: str | None = None
-    timeout: bool = False
+    timeout: bool | None = None
+    runId: int | None = None
+    conclusion: str | None = None
+    workflowUrl: str | None = None
+    commitSha: str | None = None
+
+
+class CodespaceInitRequest(BaseModel):
+    """Request to initialize a Codespace workspace."""
+
+    githubUsername: str
+
+
+class CodespaceInitResponse(APIModel):
+    """Response payload for Codespace init."""
+
+    repoFullName: str
+    repoUrl: str
+    codespaceUrl: str
+    defaultBranch: str | None = None
+    workspaceId: str
+
+
+class CodespaceStatusResponse(APIModel):
+    """Current status for a workspace repo."""
+
+    repoFullName: str
+    repoUrl: str
+    defaultBranch: str | None = None
+    latestCommitSha: str | None = None
+    lastWorkflowRunId: str | None = None
+    lastWorkflowConclusion: str | None = None
+    lastTestSummary: dict[str, Any] | None = None
+    workspaceId: str
 
 
 class ProgressSummary(APIModel):
@@ -75,6 +102,8 @@ class RecruiterCodeArtifactOut(APIModel):
 
     blob: str | None = None
     repoPath: str | None = None
+    repoFullName: str | None = None
+    repoUrl: str | None = None
 
 
 class RecruiterTestResultsOut(APIModel):
@@ -86,6 +115,9 @@ class RecruiterTestResultsOut(APIModel):
     total: int | None = None
     output: dict[str, object] | str | None = None
     lastRunAt: datetime | None = None
+    workflowRunId: str | None = None
+    commitSha: str | None = None
+    workflowUrl: str | None = None
 
 
 class RecruiterSubmissionDetailOut(APIModel):
@@ -97,7 +129,11 @@ class RecruiterSubmissionDetailOut(APIModel):
     contentText: str | None = None
     code: RecruiterCodeArtifactOut | None = None
     testResults: RecruiterTestResultsOut | None = None
+    diffSummary: dict[str, object] | str | None = None
     submittedAt: datetime
+    workflowUrl: str | None = None
+    commitUrl: str | None = None
+    diffUrl: str | None = None
 
 
 class RecruiterSubmissionListItemOut(APIModel):
@@ -109,9 +145,18 @@ class RecruiterSubmissionListItemOut(APIModel):
     dayIndex: int
     type: str
     submittedAt: datetime
+    repoFullName: str | None = None
+    repoUrl: str | None = None
+    workflowRunId: str | None = None
+    commitSha: str | None = None
+    workflowUrl: str | None = None
+    commitUrl: str | None = None
+    diffUrl: str | None = None
+    diffSummary: dict[str, object] | str | None = None
 
 
 class RecruiterSubmissionListOut(APIModel):
     """Schema for recruiter submission list output."""
 
     items: list[RecruiterSubmissionListItemOut]
+    # Extend here if pagination is added later; keep per-item fields on the list item.

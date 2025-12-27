@@ -111,14 +111,16 @@ class CorsSettings(BaseSettings):
         return value
 
 
-class SandboxSettings(BaseSettings):
-    """Sandbox client configuration."""
+class GithubSettings(BaseSettings):
+    """GitHub integration configuration."""
 
-    SANDBOX_API_URL: str = "http://sandbox"
-    SANDBOX_API_KEY: str = ""
-    SANDBOX_TIMEOUT_SECONDS: float = 30.0
-    SANDBOX_POLL_INTERVAL_SECONDS: float = 0.5
-    SANDBOX_MAX_POLL_SECONDS: float = 20.0
+    GITHUB_API_BASE: str = "https://api.github.com"
+    GITHUB_ORG: str = ""
+    GITHUB_TOKEN: str = ""
+    GITHUB_TEMPLATE_OWNER: str = ""
+    GITHUB_ACTIONS_WORKFLOW_FILE: str = "simuhire-ci.yml"
+    GITHUB_REPO_PREFIX: str = "simuhire-candidate-"
+    GITHUB_CLEANUP_ENABLED: bool = False
 
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -152,7 +154,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
-    sandbox: SandboxSettings = Field(default_factory=SandboxSettings)
+    github: GithubSettings = Field(default_factory=GithubSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
 
@@ -170,12 +172,14 @@ class Settings(BaseSettings):
             "AUTH0_ALGORITHMS",
         }
         cors_keys = {"CORS_ALLOW_ORIGINS", "CORS_ALLOW_ORIGIN_REGEX"}
-        sandbox_keys = {
-            "SANDBOX_API_URL",
-            "SANDBOX_API_KEY",
-            "SANDBOX_TIMEOUT_SECONDS",
-            "SANDBOX_POLL_INTERVAL_SECONDS",
-            "SANDBOX_MAX_POLL_SECONDS",
+        github_keys = {
+            "GITHUB_API_BASE",
+            "GITHUB_ORG",
+            "GITHUB_TOKEN",
+            "GITHUB_TEMPLATE_OWNER",
+            "GITHUB_ACTIONS_WORKFLOW_FILE",
+            "GITHUB_REPO_PREFIX",
+            "GITHUB_CLEANUP_ENABLED",
         }
 
         db_data = dict(data.get("database", {}) or {})
@@ -205,14 +209,14 @@ class Settings(BaseSettings):
         if cors_data:
             data["cors"] = cors_data
 
-        sandbox_data = dict(data.get("sandbox", {}) or {})
-        for key in sandbox_keys:
+        github_data = dict(data.get("github", {}) or {})
+        for key in github_keys:
             if key in data:
-                sandbox_data[key] = data.pop(key)
+                github_data[key] = data.pop(key)
             elif (env_val := os.getenv(key)) is not None:
-                sandbox_data[key] = env_val
-        if sandbox_data:
-            data["sandbox"] = sandbox_data
+                github_data[key] = env_val
+        if github_data:
+            data["github"] = github_data
 
         return data
 

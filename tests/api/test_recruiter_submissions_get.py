@@ -157,3 +157,38 @@ async def test_missing_submission_returns_404(
         headers={"x-dev-user-email": recruiter.email},
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_recruiter_list_includes_links(async_client, async_session: AsyncSession):
+    recruiter = await create_recruiter(
+        async_session, email="links@test.com", name="Recruiter Links"
+    )
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    sub = await create_submission(
+        async_session,
+        candidate_session=cs,
+        task=tasks[0],
+        code_blob=None,
+        code_repo_path="org/repo",
+        commit_sha="abc123",
+        workflow_run_id="555",
+        diff_summary_json=json.dumps({"base": "base1", "head": "head1"}),
+        submitted_at=datetime.now(UTC),
+    )
+    resp = await async_client.get(
+        "/api/submissions",
+        headers={"x-dev-user-email": recruiter.email},
+    )
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    found = next(i for i in items if i["submissionId"] == sub.id)
+    assert found["repoFullName"] == "org/repo"
+    assert found["workflowRunId"] == "555"
+    assert found["commitSha"] == "abc123"
+    assert found["workflowUrl"]
+    assert found["commitUrl"]
+    assert found["diffUrl"]

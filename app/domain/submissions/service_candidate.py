@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+import re
+from datetime import datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -11,10 +13,16 @@ from app.domain import CandidateSession, Submission, Task
 from app.domain.candidate_sessions import service as cs_service
 from app.domain.simulations import tasks_repository as tasks_repo
 from app.domain.submissions import repository as submissions_repo
-from app.services.sandbox_client import SandboxClient, SandboxRunResult
+from app.domain.workspaces import repository as workspace_repo
+from app.domain.workspaces.workspace import Workspace
+from app.services.github.actions import ActionsRunResult, GithubActionsRunner
+from app.services.github.client import GithubClient, GithubError
 
 TEXT_TASK_TYPES = {"design", "documentation", "handoff"}
 CODE_TASK_TYPES = {"code", "debug"}
+_GITHUB_USERNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
+_REPO_FULL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,200}$")
 
 
 def is_code_task(task: Task) -> bool:
@@ -62,10 +70,9 @@ def ensure_in_order(current_task: Task | None, target_task_id: int) -> None:
         )
 
 
-def validate_payload(task: Task, payload) -> None:
-    """Validate submission payload based on task type."""
+def validate_submission_payload(task: Task, payload) -> None:
+    """Validate submission payload for non-code tasks."""
     task_type = (task.type or "").lower()
-
     if task_type in TEXT_TASK_TYPES:
         if not payload.contentText or not payload.contentText.strip():
             raise HTTPException(
@@ -73,13 +80,8 @@ def validate_payload(task: Task, payload) -> None:
                 detail="contentText is required",
             )
     elif task_type in CODE_TASK_TYPES:
-        has_code_blob = bool(payload.codeBlob and payload.codeBlob.strip())
-        has_files = bool(payload.files)
-        if not (has_code_blob or has_files):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="codeBlob or files is required",
-            )
+        # Code tasks are GitHub-native; no payload validation required.
+        return
     else:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -87,55 +89,159 @@ def validate_payload(task: Task, payload) -> None:
         )
 
 
-def validate_run_payload(task: Task, payload) -> None:
-    """Validate sandbox run payload for code/debug tasks."""
+def validate_run_allowed(task: Task) -> None:
+    """Run tests only applies to code/debug tasks."""
     if not is_code_task(task):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Run tests is only available for code tasks",
         )
-    has_code_blob = bool(payload.codeBlob and payload.codeBlob.strip())
-    has_files = bool(payload.files)
-    if not (has_code_blob or has_files):
+
+
+def build_repo_name(
+    *,
+    prefix: str,
+    candidate_session: CandidateSession,
+    task: Task,
+) -> str:
+    """Construct a deterministic repo name for a workspace."""
+    return f"{prefix}{candidate_session.id}-task{task.id}"
+
+
+_GITHUB_USERNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
+_REPO_FULL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+
+def validate_github_username(username: str) -> None:
+    """Ensure GitHub username follows GitHub rules."""
+    if not username or len(username) > 39 or not _GITHUB_USERNAME_RE.match(username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="codeBlob or files is required",
+            detail="Invalid GitHub username",
         )
 
 
-async def build_task_ref(db: AsyncSession, task: Task) -> str:
-    """Derive a stable task reference for sandbox bundles."""
-    scenario = await submissions_repo.simulation_template(db, task.simulation_id)
-    scenario_prefix = (scenario or "default").strip().replace(" ", "-").lower()
-    task_type = (task.type or "task").strip().lower()
+def validate_repo_full_name(name: str) -> None:
+    """Validate owner/repo format to avoid SSRF/path traversal."""
+    if not _REPO_FULL_NAME_RE.match(name or ""):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid repository name",
+        )
 
-    day_value = None
-    for attr in ("day_index", "day", "day_number"):
-        if hasattr(task, attr):
-            val = getattr(task, attr, None)
-            if val is not None:
-                day_value = int(val)
-                break
-    if day_value is None:
-        for attr in ("order", "position", "sequence"):
-            if hasattr(task, attr):
-                val = getattr(task, attr, None)
-                if val is not None:
-                    day_value = int(val)
-                    break
 
-    derived_default = False
-    if day_value is None:
-        day_value = 1
-        derived_default = True
+def validate_branch(branch: str | None) -> str | None:
+    """Ensure branch names are safe-ish."""
+    if branch is None:
+        return None
+    if not isinstance(branch, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid branch name",
+        )
+    if (
+        ".." in branch
+        or "//" in branch
+        or branch.startswith("/")
+        or branch.endswith("/")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid branch name",
+        )
+    if not _BRANCH_RE.match(branch):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid branch name",
+        )
+    return branch
 
-    if not derived_default and 0 <= day_value <= 4:
-        day_value += 1
-    if day_value <= 0:
-        day_value = 1
-    day_part = f"day{day_value}"
 
-    return f"{scenario_prefix}-{day_part}-{task_type}"
+async def ensure_workspace(
+    db: AsyncSession,
+    *,
+    candidate_session: CandidateSession,
+    task: Task,
+    github_client: GithubClient,
+    github_username: str,
+    repo_prefix: str,
+    template_default_owner: str | None,
+    now: datetime,
+) -> Workspace:
+    """Fetch or create a workspace for the candidate+task."""
+    if github_username:
+        validate_github_username(github_username)
+    existing = await workspace_repo.get_by_session_and_task(
+        db, candidate_session_id=candidate_session.id, task_id=task.id
+    )
+    if existing:
+        return existing
+
+    template_repo = (task.template_repo or "").strip()
+    if not template_repo:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Task template repository is not configured",
+        )
+    validate_repo_full_name(template_repo)
+
+    new_repo_name = build_repo_name(
+        prefix=repo_prefix, candidate_session=candidate_session, task=task
+    )
+    template_owner = template_repo.split("/")[0] if "/" in template_repo else None
+    generated = await github_client.generate_repo_from_template(
+        template_full_name=template_repo,
+        new_repo_name=new_repo_name,
+        owner=template_owner or template_default_owner,
+        private=True,
+    )
+
+    repo_full_name = generated.get("full_name") or ""
+    default_branch = generated.get("default_branch") or generated.get("master_branch")
+    repo_id = generated.get("id")
+    validate_repo_full_name(repo_full_name)
+
+    base_template_sha = None
+    branch_to_fetch = default_branch or "main"
+    try:
+        branch_data = await github_client.get_branch(repo_full_name, branch_to_fetch)
+        base_template_sha = (branch_data.get("commit") or {}).get("sha")
+    except GithubError:
+        base_template_sha = None
+
+    if github_username:
+        import contextlib
+
+        with contextlib.suppress(GithubError):
+            await github_client.add_collaborator(repo_full_name, github_username)
+
+    ws = await workspace_repo.create_workspace(
+        db,
+        candidate_session_id=candidate_session.id,
+        task_id=task.id,
+        template_repo_full_name=template_repo,
+        repo_full_name=repo_full_name,
+        repo_id=repo_id,
+        default_branch=default_branch,
+        base_template_sha=base_template_sha,
+        created_at=now,
+    )
+    return ws
+
+
+async def record_run_result(
+    db: AsyncSession, workspace: Workspace, result: ActionsRunResult
+) -> Workspace:
+    """Persist latest workflow result on the workspace."""
+    workspace.last_workflow_run_id = str(result.run_id)
+    workspace.last_workflow_conclusion = result.conclusion
+    workspace.latest_commit_sha = result.head_sha
+    workspace.last_test_summary_json = json.dumps(
+        result.as_test_output, ensure_ascii=False
+    )
+    await db.commit()
+    await db.refresh(workspace)
+    return workspace
 
 
 async def create_submission(
@@ -145,27 +251,35 @@ async def create_submission(
     payload,
     *,
     now: datetime,
-    sandbox_result: SandboxRunResult | None = None,
+    actions_result: ActionsRunResult | None = None,
+    workspace: Workspace | None = None,
+    diff_summary_json: str | None = None,
 ) -> Submission:
     """Persist a submission with conflict handling."""
     tests_passed = None
     tests_failed = None
     test_output = None
     last_run_at = None
-    if sandbox_result is not None:
-        serialized = serialize_sandbox_result(sandbox_result, now=now)
-        tests_passed = serialized["tests_passed"]
-        tests_failed = serialized["tests_failed"]
-        test_output = serialized["test_output"]
-        last_run_at = serialized["last_run_at"]
+    commit_sha = None
+    workflow_run_id = None
+    if actions_result is not None:
+        tests_passed = actions_result.passed
+        tests_failed = actions_result.failed
+        test_output = json.dumps(actions_result.as_test_output, ensure_ascii=False)
+        last_run_at = now
+        commit_sha = actions_result.head_sha
+        workflow_run_id = str(actions_result.run_id)
 
     sub = Submission(
         candidate_session_id=candidate_session.id,
         task_id=task.id,
         submitted_at=now,
         content_text=payload.contentText,
-        code_blob=payload.codeBlob,
-        code_repo_path=None,
+        code_repo_path=workspace.repo_full_name if workspace else None,
+        code_blob=None,
+        commit_sha=commit_sha,
+        workflow_run_id=workflow_run_id,
+        diff_summary_json=diff_summary_json,
         tests_passed=tests_passed,
         tests_failed=tests_failed,
         test_output=test_output,
@@ -189,7 +303,7 @@ async def progress_after_submission(
     """Recompute progress and update completion status if applicable."""
     (
         _,
-        completed_task_ids,
+        _completed_task_ids,
         _current,
         completed,
         total,
@@ -206,36 +320,47 @@ async def progress_after_submission(
     return completed, total, is_complete
 
 
-def serialize_sandbox_result(
-    result: SandboxRunResult, *, now: datetime | None = None
-) -> dict[str, object]:
-    """Convert sandbox result into fields stored on Submission."""
-    now = now or datetime.now(UTC)
-    payload = {
-        "status": result.status,
-        "passed": result.passed,
-        "failed": result.failed,
-        "total": result.total,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
-        "timeout": result.timeout,
-    }
-    return {
-        "tests_passed": result.passed,
-        "tests_failed": result.failed,
-        "test_output": json.dumps(payload, ensure_ascii=False),
-        "last_run_at": now,
-    }
-
-
-async def run_sandbox_tests(
-    db: AsyncSession,
-    task: Task,
-    payload,
-    sandbox_client: SandboxClient,
-) -> SandboxRunResult:
-    """Execute sandbox tests for a task using common taskRef mapping."""
-    task_ref = await build_task_ref(db, task)
-    return await sandbox_client.run_tests(
-        task_ref=task_ref, code=payload.codeBlob, files=payload.files
+async def run_actions_tests(
+    *,
+    runner: GithubActionsRunner,
+    workspace: Workspace,
+    branch: str,
+    workflow_inputs: dict[str, Any] | None,
+) -> ActionsRunResult:
+    """Trigger and wait for Actions workflow for a workspace."""
+    return await runner.dispatch_and_wait(
+        repo_full_name=workspace.repo_full_name,
+        ref=branch,
+        inputs=workflow_inputs or {},
     )
+
+
+def summarize_diff(
+    compare_payload: dict[str, Any], *, base: str | None, head: str | None
+) -> dict[str, Any]:
+    """Reduce GitHub compare payload into a compact summary."""
+    files = []
+    for f in compare_payload.get("files") or []:
+        files.append(
+            {
+                "filename": f.get("filename"),
+                "status": f.get("status"),
+                "additions": f.get("additions"),
+                "deletions": f.get("deletions"),
+                "changes": f.get("changes"),
+                "patch": f.get("patch"),
+            }
+        )
+    return {
+        "ahead_by": compare_payload.get("ahead_by"),
+        "behind_by": compare_payload.get("behind_by"),
+        "total_commits": compare_payload.get("total_commits"),
+        "base": base,
+        "head": head,
+        "files": files,
+    }
+
+
+def build_codespace_url(repo_full_name: str) -> str:
+    """Return a GitHub URL to create/open a Codespace for the repo."""
+    return f"https://github.com/codespaces/new?repo={repo_full_name}"

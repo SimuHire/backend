@@ -65,12 +65,16 @@ async def create_simulation(
 
     tasks: list[Task] = []
     for blueprint_task in DEFAULT_5_DAY_BLUEPRINT:
+        template_repo = None
+        if blueprint_task["type"] in {"code", "debug"}:
+            template_repo = "simuhire-templates/demo-template"
         task = Task(
             simulation_id=sim.id,
             day_index=blueprint_task["day_index"],
             type=blueprint_task["type"],
             title=blueprint_task["title"],
             description=blueprint_task["description"],
+            template_repo=template_repo,
         )
         session.add(task)
         tasks.append(task)
@@ -124,6 +128,9 @@ async def create_submission(
     test_output: str | None = None,
     code_repo_path: str | None = None,
     last_run_at: datetime | None = None,
+    commit_sha: str | None = None,
+    workflow_run_id: str | None = None,
+    diff_summary_json: str | None = None,
 ) -> Submission:
     submission = Submission(
         candidate_session_id=candidate_session.id,
@@ -132,6 +139,9 @@ async def create_submission(
         content_text=content_text,
         code_blob=code_blob,
         code_repo_path=code_repo_path,
+        commit_sha=commit_sha,
+        workflow_run_id=workflow_run_id,
+        diff_summary_json=diff_summary_json,
         tests_passed=tests_passed,
         tests_failed=tests_failed,
         test_output=test_output,

@@ -41,17 +41,21 @@ def test_auth0_helpers_default_to_domain():
     assert s.auth0_algorithms == ["RS256", "HS256"]
 
 
-def test_sandbox_settings_merge_flat_env():
+def test_github_settings_merge_flat_env():
     s = Settings(
-        SANDBOX_API_URL="http://sandbox",
-        SANDBOX_API_KEY="token123",
-        SANDBOX_TIMEOUT_SECONDS="15",
-        SANDBOX_POLL_INTERVAL_SECONDS="0.2",
-        SANDBOX_MAX_POLL_SECONDS="5",
+        GITHUB_API_BASE="https://api.github.com",
+        GITHUB_ORG="simuhire",
+        GITHUB_TOKEN="ghp_123",
+        GITHUB_TEMPLATE_OWNER="simuhire-templates",
+        GITHUB_ACTIONS_WORKFLOW_FILE="ci.yml",
+        GITHUB_REPO_PREFIX="prefix-",
+        GITHUB_CLEANUP_ENABLED="True",
     )
 
-    assert s.sandbox.SANDBOX_API_URL == "http://sandbox"
-    assert s.sandbox.SANDBOX_API_KEY == "token123"
-    assert float(s.sandbox.SANDBOX_TIMEOUT_SECONDS) == 15.0
-    assert float(s.sandbox.SANDBOX_POLL_INTERVAL_SECONDS) == 0.2
-    assert float(s.sandbox.SANDBOX_MAX_POLL_SECONDS) == 5.0
+    assert s.github.GITHUB_API_BASE == "https://api.github.com"
+    assert s.github.GITHUB_ORG == "simuhire"
+    assert s.github.GITHUB_TOKEN == "ghp_123"
+    assert s.github.GITHUB_TEMPLATE_OWNER == "simuhire-templates"
+    assert s.github.GITHUB_ACTIONS_WORKFLOW_FILE == "ci.yml"
+    assert s.github.GITHUB_REPO_PREFIX == "prefix-"
+    assert s.github.GITHUB_CLEANUP_ENABLED is True

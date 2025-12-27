@@ -9,5 +9,13 @@ async def test_submissions_table_has_test_result_columns(db_engine):
             lambda sync_conn: inspect(sync_conn).get_columns("submissions")
         )
     names = {col["name"] for col in columns}
-    required = {"tests_passed", "tests_failed", "test_output", "last_run_at"}
+    required = {
+        "tests_passed",
+        "tests_failed",
+        "test_output",
+        "last_run_at",
+        "commit_sha",
+        "workflow_run_id",
+        "diff_summary_json",
+    }
     assert required.issubset(names)

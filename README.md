@@ -35,10 +35,13 @@ FastAPI + Postgres backend for SimuHire, a simulation-based hiring platform. Rec
 - **Candidate**
   - `GET /api/candidate/session/{token}` resolve invite; sets `in_progress`
   - `GET /api/candidate/session/{id}/current_task` (header `x-candidate-token`) returns current task, progress; auto-completes if done
-  - `POST /api/tasks/{task_id}/submit` (headers `x-candidate-token`, `x-candidate-session-id`) submit current task; validates order and payload
+  - Codespaces: `POST /api/tasks/{task_id}/codespace/init` provisions a GitHub template repo for the task; `GET /api/tasks/{task_id}/codespace/status` reports latest workflow state.
+  - Runs/Submissions: `POST /api/tasks/{task_id}/run` triggers GitHub Actions tests on the workspace; `POST /api/tasks/{task_id}/submit` records final results (GitHub Actions conclusions + diff summary).
 - **Recruiter – Submissions**
   - `GET /api/submissions` (optional `candidateSessionId`, `taskId`) list for owned simulations
-  - `GET /api/submissions/{submission_id}` fetch submission detail (content/code/test results)
+  - `GET /api/submissions/{submission_id}` fetch submission detail (content/code/test results, commit/workflow metadata)
+
+See `docs/codespaces_actions.md` for Codespaces + Actions setup and artifact contract.
 
 Auth notes:
 
@@ -95,6 +98,14 @@ Key env vars (see `.env`):
 - Auth0: `AUTH0_DOMAIN`, `AUTH0_ISSUER`, `AUTH0_JWKS_URL`, `AUTH0_API_AUDIENCE`, `AUTH0_ALGORITHMS`
 - CORS: `CORS_ALLOW_ORIGINS`, `CORS_ALLOW_ORIGIN_REGEX`
 - Candidate portal: `CANDIDATE_PORTAL_BASE_URL` (used to build invite links)
+- GitHub/Codespaces/Actions:
+  - `GITHUB_API_BASE` (default `https://api.github.com`)
+  - `GITHUB_ORG` (or owner for generated repos)
+  - `GITHUB_TOKEN` (bot/app token with repo + actions scope)
+  - `GITHUB_TEMPLATE_OWNER` (fallback owner for templates)
+  - `GITHUB_ACTIONS_WORKFLOW_FILE` (workflow filename/id to dispatch)
+  - `GITHUB_REPO_PREFIX` (prefix for generated candidate repos)
+  - `GITHUB_CLEANUP_ENABLED` (optional cleanup toggle)
 - Dev bypass: `DEV_AUTH_BYPASS=1` enables `x-dev-user-email` on local/test only
 
 ## Code Structure
@@ -112,7 +123,7 @@ Key env vars (see `.env`):
 
 ## Future Work / Gaps
 
-- Hook sandbox/test runner to populate `tests_passed/tests_failed/test_output`.
+- Harden GitHub App authentication (installation tokens, narrow scopes) and production-grade rate limiting/analytics.
 - Implement AI evaluation/report generation to create `ExecutionProfile` records and expose report data.
 - Candidate authentication beyond bearer token possession (optional).
 - Audit logging/analytics; richer task content (starter code paths/tests currently unused).

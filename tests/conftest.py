@@ -14,7 +14,7 @@ from app.core.db import get_session
 from app.core.security.current_user import get_current_user
 from app.domain import Base, User
 from app.main import app
-from app.services.sandbox_client import SandboxRunResult
+from app.services.github.actions import ActionsRunResult
 
 
 @pytest.fixture(scope="session")
@@ -91,37 +91,75 @@ async def async_client(db_session: AsyncSession):
 
 
 @pytest.fixture
-def sandbox_stubber():
-    """Fixture-scoped helper to override sandbox client dependency."""
+def actions_stubber():
+    """Fixture-scoped helper to override GitHub Actions runner + client dependencies."""
 
-    def _apply(result: SandboxRunResult | None = None, error: Exception | None = None):
-        class StubClient:
-            def __init__(self, res: SandboxRunResult | None, err: Exception | None):
-                self._result = res or SandboxRunResult(
+    def _apply(result: ActionsRunResult | None = None, error: Exception | None = None):
+        class StubActionsRunner:
+            def __init__(self, res: ActionsRunResult | None, err: Exception | None):
+                self._result = res or ActionsRunResult(
                     status="passed",
-                    passed=0,
+                    run_id=123,
+                    conclusion="success",
+                    passed=1,
                     failed=0,
-                    total=0,
-                    stdout="",
-                    stderr="",
-                    duration_ms=None,
+                    total=1,
+                    stdout="ok",
+                    stderr=None,
+                    head_sha="abc123",
+                    html_url="https://example.com/run/123",
                     raw=None,
                 )
                 self._error = err
 
-            async def run_tests(self, **_kwargs):
+            async def dispatch_and_wait(self, **_kwargs):
                 if self._error:
                     raise self._error
                 return self._result
 
-        client = StubClient(result, error)
-        app.dependency_overrides[candidate_submissions.get_sandbox_client] = (
-            lambda: client
+            async def fetch_run_result(self, **_kwargs):
+                if self._error:
+                    raise self._error
+                return self._result
+
+        class StubGithubClient:
+            async def generate_repo_from_template(
+                self,
+                *,
+                template_full_name: str,
+                new_repo_name: str,
+                owner=None,
+                private=True,
+            ):
+                return {
+                    "full_name": f"org/{new_repo_name}",
+                    "id": 999,
+                    "default_branch": "main",
+                }
+
+            async def add_collaborator(
+                self, repo_full_name: str, username: str, *, permission: str = "push"
+            ):
+                return {"ok": True}
+
+            async def get_branch(self, repo_full_name: str, branch: str):
+                return {"commit": {"sha": "base-sha-123"}}
+
+            async def get_compare(self, repo_full_name: str, base: str, head: str):
+                return {"ahead_by": 0, "behind_by": 0, "total_commits": 0, "files": []}
+
+        runner = StubActionsRunner(result, error)
+        app.dependency_overrides[candidate_submissions.get_actions_runner] = (
+            lambda: runner
         )
-        return client
+        app.dependency_overrides[candidate_submissions.get_github_client] = (
+            lambda: StubGithubClient()
+        )
+        return runner
 
     yield _apply
-    app.dependency_overrides.pop(candidate_submissions.get_sandbox_client, None)
+    app.dependency_overrides.pop(candidate_submissions.get_actions_runner, None)
+    app.dependency_overrides.pop(candidate_submissions.get_github_client, None)
 
 
 @pytest.fixture

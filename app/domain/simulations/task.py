@@ -17,7 +17,9 @@ class Task(Base):
     description: Mapped[str] = mapped_column(Text)
     starter_code_path: Mapped[str | None] = mapped_column(String(500))
     test_file_path: Mapped[str | None] = mapped_column(String(500))
+    template_repo: Mapped[str | None] = mapped_column(String(255))
     max_score: Mapped[int | None] = mapped_column(Integer)
 
     simulation = relationship("Simulation", back_populates="tasks")
     submissions = relationship("Submission", back_populates="task")
+    workspaces = relationship("Workspace", back_populates="task")

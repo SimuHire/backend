@@ -28,6 +28,10 @@ class Submission(Base):
     code_repo_path: Mapped[str | None] = mapped_column(String(500))
     code_blob: Mapped[str | None] = mapped_column(Text)
 
+    commit_sha: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    workflow_run_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    diff_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     tests_passed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tests_failed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     test_output: Mapped[str | None] = mapped_column(Text, nullable=True)

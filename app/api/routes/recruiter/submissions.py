@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import Annotated
 
@@ -66,6 +67,31 @@ async def get_submission_detail(
         },
     )
 
+    diff_summary = None
+    if sub.diff_summary_json:
+        try:
+            diff_summary = json.loads(sub.diff_summary_json)
+        except ValueError:
+            diff_summary = sub.diff_summary_json
+
+    repo_full_name = sub.code_repo_path
+    commit_url = (
+        f"https://github.com/{repo_full_name}/commit/{sub.commit_sha}"
+        if repo_full_name and sub.commit_sha
+        else None
+    )
+    workflow_url = (
+        f"https://github.com/{repo_full_name}/actions/runs/{sub.workflow_run_id}"
+        if repo_full_name and sub.workflow_run_id
+        else None
+    )
+    diff_url = None
+    if repo_full_name and isinstance(diff_summary, dict):
+        base = diff_summary.get("base")
+        head = diff_summary.get("head")
+        if base and head:
+            diff_url = f"https://github.com/{repo_full_name}/compare/{base}...{head}"
+
     return RecruiterSubmissionDetailOut(
         submissionId=sub.id,
         candidateSessionId=cs.id,
@@ -78,7 +104,14 @@ async def get_submission_detail(
         },
         contentText=sub.content_text,
         code=(
-            {"blob": sub.code_blob, "repoPath": sub.code_repo_path}
+            {
+                "blob": sub.code_blob,
+                "repoPath": sub.code_repo_path,
+                "repoFullName": sub.code_repo_path,
+                "repoUrl": f"https://github.com/{sub.code_repo_path}"
+                if sub.code_repo_path
+                else None,
+            }
             if (sub.code_blob is not None or sub.code_repo_path is not None)
             else None
         ),
@@ -90,6 +123,10 @@ async def get_submission_detail(
                 "total": total,
                 "output": parsed_output,
                 "lastRunAt": sub.last_run_at,
+                "workflowRunId": sub.workflow_run_id,
+                "commitSha": sub.commit_sha,
+                "workflowUrl": workflow_url,
+                "commitUrl": commit_url,
             }
             if (
                 status_str is not None
@@ -99,7 +136,11 @@ async def get_submission_detail(
             )
             else None
         ),
+        diffSummary=diff_summary,
         submittedAt=sub.submitted_at,
+        workflowUrl=workflow_url,
+        commitUrl=commit_url,
+        diffUrl=diff_url,
     )
 
 
@@ -122,6 +163,33 @@ async def list_submissions(
 
     items: list[RecruiterSubmissionListItemOut] = []
     for sub, task, _cs, _sim in rows:
+        diff_summary = None
+        if sub.diff_summary_json:
+            try:
+                diff_summary = json.loads(sub.diff_summary_json)
+            except ValueError:
+                diff_summary = sub.diff_summary_json
+
+        repo_full_name = sub.code_repo_path
+        commit_url = (
+            f"https://github.com/{repo_full_name}/commit/{sub.commit_sha}"
+            if repo_full_name and sub.commit_sha
+            else None
+        )
+        workflow_url = (
+            f"https://github.com/{repo_full_name}/actions/runs/{sub.workflow_run_id}"
+            if repo_full_name and sub.workflow_run_id
+            else None
+        )
+        diff_url = None
+        if repo_full_name and isinstance(diff_summary, dict):
+            base = diff_summary.get("base")
+            head = diff_summary.get("head")
+            if base and head:
+                diff_url = (
+                    f"https://github.com/{repo_full_name}/compare/{base}...{head}"
+                )
+
         items.append(
             RecruiterSubmissionListItemOut(
                 submissionId=sub.id,
@@ -130,6 +198,16 @@ async def list_submissions(
                 dayIndex=task.day_index,
                 type=task.type,
                 submittedAt=sub.submitted_at,
+                repoFullName=repo_full_name,
+                repoUrl=f"https://github.com/{repo_full_name}"
+                if repo_full_name
+                else None,
+                workflowRunId=sub.workflow_run_id,
+                commitSha=sub.commit_sha,
+                workflowUrl=workflow_url,
+                commitUrl=commit_url,
+                diffUrl=diff_url,
+                diffSummary=diff_summary,
             )
         )
 

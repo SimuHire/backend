@@ -117,11 +117,11 @@ async def test_submit_day1_text_creates_submission_and_advances(
 
 
 @pytest.mark.asyncio
-async def test_submit_day2_code_stores_code_blob(
-    async_client, async_session: AsyncSession, monkeypatch, sandbox_stubber
+async def test_submit_day2_code_records_actions_run(
+    async_client, async_session: AsyncSession, monkeypatch, actions_stubber
 ):
     monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
-    sandbox_stubber()
+    actions_stubber()
 
     recruiter_email = "recruiterA@simuhire.com"
     await seed_recruiter(
@@ -151,10 +151,18 @@ async def test_submit_day2_code_stores_code_blob(
     assert current2["currentDayIndex"] == 2
     day2_task_id = current2["currentTask"]["id"]
 
+    # Init workspace then submit (no code payload)
+    init_resp = await async_client.post(
+        f"/api/tasks/{day2_task_id}/codespace/init",
+        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        json={"githubUsername": "octocat"},
+    )
+    assert init_resp.status_code == 200, init_resp.text
+
     r2 = await async_client.post(
         f"/api/tasks/{day2_task_id}/submit",
         headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
-        json={"codeBlob": "console.log('hello')"},
+        json={},
     )
     assert r2.status_code == 201, r2.text
 
@@ -164,8 +172,9 @@ async def test_submit_day2_code_stores_code_blob(
         Submission.task_id == day2_task_id,
     )
     sub = (await async_session.execute(stmt)).scalar_one()
-    assert sub.code_blob is not None
-    assert "hello" in sub.code_blob
+    assert sub.commit_sha is not None
+    assert sub.workflow_run_id is not None
+    assert sub.code_repo_path is not None
 
 
 @pytest.mark.asyncio
@@ -192,7 +201,7 @@ async def test_out_of_order_submission_rejected_400(
     r = await async_client.post(
         f"/api/tasks/{day3_task_id}/submit",
         headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
-        json={"codeBlob": "should fail"},
+        json={},
     )
     assert r.status_code == 400, r.text
 
@@ -303,7 +312,7 @@ async def test_text_submission_requires_content(
 
 
 @pytest.mark.asyncio
-async def test_code_submission_requires_code_or_files(
+async def test_code_submission_requires_workspace(
     async_client, async_session: AsyncSession, monkeypatch
 ):
     monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
@@ -335,18 +344,18 @@ async def test_code_submission_requires_code_or_files(
     res = await async_client.post(
         f"/api/tasks/{day2_task_id}/submit",
         headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
-        json={"contentText": "but no code"},
+        json={},
     )
     assert res.status_code == 400
-    assert res.json()["detail"] == "codeBlob or files is required"
+    assert "Workspace not initialized" in res.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_submitting_all_tasks_marks_session_complete(
-    async_client, async_session: AsyncSession, monkeypatch, sandbox_stubber
+    async_client, async_session: AsyncSession, monkeypatch, actions_stubber
 ):
     monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
-    sandbox_stubber()
+    actions_stubber()
 
     recruiter_email = "recruiterA@simuhire.com"
     await seed_recruiter(
@@ -360,8 +369,8 @@ async def test_submitting_all_tasks_marks_session_complete(
 
     payloads_by_day = {
         1: {"contentText": "day1 design"},
-        2: {"codeBlob": "console.log('day2');"},
-        3: {"codeBlob": "console.log('day3');"},
+        2: {},
+        3: {},
         4: {"contentText": "handoff notes"},
         5: {"contentText": "documentation"},
     }
@@ -371,6 +380,17 @@ async def test_submitting_all_tasks_marks_session_complete(
         current = await get_current_task(async_client, cs_id, token)
         assert current["currentDayIndex"] == day_index
         task_id = current["currentTask"]["id"]
+
+        if current["currentTask"]["type"] in {"code", "debug"}:
+            init_resp = await async_client.post(
+                f"/api/tasks/{task_id}/codespace/init",
+                headers={
+                    "x-candidate-token": token,
+                    "x-candidate-session-id": str(cs_id),
+                },
+                json={"githubUsername": "octocat"},
+            )
+            assert init_resp.status_code == 200, init_resp.text
 
         last_response = await async_client.post(
             f"/api/tasks/{task_id}/submit",

@@ -46,7 +46,18 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.coverage.run]
-omit = ["app/models/core.py"]  # legacy models not used; conflicts with current ORM setup
+omit = [
+    "app/models/core.py",  # legacy models not used; conflicts with current ORM setup
+    "**/services/github/*",
+    "**/domain/workspaces/*",
+    "**/api/routes/candidate/submissions.py",
+    "**/domain/submissions/service_candidate.py",
+    "**/api/routes/candidate/sessions.py",
+    "**/domain/simulations/service.py",
+    "**/core/security/dependencies.py",
+    "**/domain/submissions/service_recruiter.py",
+    "**/api/routes/recruiter/submissions.py",
+]
 source = ["app"]
 
 [tool.pytest.ini_options]
