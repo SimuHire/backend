@@ -1,0 +1,17 @@
+from app.domain.simulations.service import _template_repo_for_task
+from tests.factories import create_recruiter, create_simulation
+
+
+async def test_template_repo_mapping_code_and_debug(async_session):
+    assert _template_repo_for_task(2, "code") == "simuhire-dev/simuhire-template-python"
+    assert (
+        _template_repo_for_task(3, "debug") == "simuhire-dev/simuhire-template-python"
+    )
+
+
+async def test_create_simulation_sets_template_repo(async_session):
+    recruiter = await create_recruiter(async_session, email="template-map@sim.com")
+    _sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    for task in tasks:
+        if task.type in {"code", "debug"}:
+            assert task.template_repo

@@ -206,13 +206,14 @@ class GithubClient:
                 )
             except httpx.HTTPError as exc:  # pragma: no cover - network
                 logger.error(
-                    "github_request_failed", extra={"url": url, "error": str(exc)}
+                    f"github_request_failed {exc}",
+                    extra={"url": url, "error": str(exc)},
                 )
                 raise GithubError("GitHub request failed") from exc
 
         if resp.status_code >= 400:
             logger.error(
-                "github_error",
+                f"github_error {resp.status_code}",
                 extra={
                     "url": url,
                     "status_code": resp.status_code,
@@ -254,7 +255,8 @@ class GithubClient:
                 )
             except httpx.HTTPError as exc:  # pragma: no cover - network
                 logger.error(
-                    "github_request_failed", extra={"url": url, "error": str(exc)}
+                    f"github_request_failed {exc}",
+                    extra={"url": url, "error": str(exc)},
                 )
                 raise GithubError("GitHub request failed") from exc
 

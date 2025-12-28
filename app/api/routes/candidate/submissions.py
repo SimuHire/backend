@@ -131,7 +131,7 @@ async def init_codespace(
         )
     except GithubError as exc:
         logger.error(
-            "github_workspace_create_failed",
+            f"github_workspace_create_failed {exc}",
             extra={
                 "task_id": task.id,
                 "candidate_session_id": cs.id,
@@ -249,7 +249,7 @@ async def run_task_tests(
         )
     except GithubError as exc:
         logger.error(
-            "github_run_failed",
+            f"github_run_failed {exc}",
             extra={
                 "task_id": task.id,
                 "candidate_session_id": cs.id,

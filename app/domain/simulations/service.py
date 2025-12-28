@@ -16,8 +16,8 @@ from app.domain.simulations import repository as sim_repo
 from app.domain.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
 
 DEFAULT_TEMPLATE_REPOS = {
-    2: "simuhire-templates/node-day2-api",
-    3: "simuhire-templates/node-day3-debug",
+    2: "simuhire-dev/simuhire-template-python",
+    3: "simuhire-dev/simuhire-template-python",
 }
 
 INVITE_TOKEN_TTL_DAYS = 14

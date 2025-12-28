@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import CandidateSession, Company, Simulation, Submission, Task, User
 from app.domain.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
+from app.domain.simulations.service import DEFAULT_TEMPLATE_REPOS
 
 
 async def create_company(session: AsyncSession, *, name: str = "Acme Corp") -> Company:
@@ -65,9 +66,7 @@ async def create_simulation(
 
     tasks: list[Task] = []
     for blueprint_task in DEFAULT_5_DAY_BLUEPRINT:
-        template_repo = None
-        if blueprint_task["type"] in {"code", "debug"}:
-            template_repo = "simuhire-templates/demo-template"
+        template_repo = DEFAULT_TEMPLATE_REPOS.get(blueprint_task["day_index"])
         task = Task(
             simulation_id=sim.id,
             day_index=blueprint_task["day_index"],

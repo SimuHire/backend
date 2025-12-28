@@ -12,6 +12,76 @@ from tests.factories import (
 
 
 @pytest.mark.asyncio
+async def test_codespace_init_works_for_debug_task(
+    async_client, async_session, candidate_header_factory, actions_stubber
+):
+    actions_stubber()
+    recruiter = await create_recruiter(async_session, email="debug-task@sim.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    # Complete earlier tasks to allow day 3 debug
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[0], content_text="day1"
+    )
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[1], content_text="day2"
+    )
+    await async_session.commit()
+
+    headers = candidate_header_factory(cs.id, cs.token)
+    resp = await async_client.post(
+        f"/api/tasks/{tasks[2].id}/codespace/init",
+        headers=headers,
+        json={"githubUsername": "octocat"},
+    )
+
+    app.dependency_overrides.pop(candidate_submissions.get_actions_runner, None)
+    app.dependency_overrides.pop(candidate_submissions.get_github_client, None)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["repoFullName"]
+    assert body["workspaceId"]
+
+
+@pytest.mark.asyncio
+async def test_codespace_init_missing_template_repo_returns_500(
+    async_client, async_session, candidate_header_factory, actions_stubber
+):
+    actions_stubber()
+    recruiter = await create_recruiter(async_session, email="missing-template@sim.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    # Complete earlier tasks to allow day 3 debug
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[0], content_text="day1"
+    )
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[1], content_text="day2"
+    )
+    # Remove template repo for debug task to trigger error
+    tasks[2].template_repo = None
+    await async_session.commit()
+
+    headers = candidate_header_factory(cs.id, cs.token)
+    resp = await async_client.post(
+        f"/api/tasks/{tasks[2].id}/codespace/init",
+        headers=headers,
+        json={"githubUsername": "octocat"},
+    )
+
+    app.dependency_overrides.pop(candidate_submissions.get_actions_runner, None)
+    app.dependency_overrides.pop(candidate_submissions.get_github_client, None)
+
+    assert resp.status_code == 500
+    assert "template repository is not configured" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_run_tests_returns_actions_result(
     async_client, async_session, candidate_header_factory, actions_stubber
 ):
