@@ -7,6 +7,7 @@ from app.services.template_catalog import (
     TemplateKeyError,
     normalize_template_repo_value,
     resolve_template_repo_full_name,
+    validate_template_key,
 )
 
 
@@ -76,3 +77,20 @@ def test_normalize_template_repo_value_rewrites_legacy_with_template_key():
         "simuhire-templates/node-day2-api", template_key="node-express-ts"
     )
     assert repo == "simuhire-dev/simuhire-template-node-express-ts"
+
+
+def test_normalize_template_repo_value_returns_none_when_no_hints():
+    assert normalize_template_repo_value("", template_key=None) is None
+
+
+def test_validate_template_key_requires_string():
+    with pytest.raises(TemplateKeyError):
+        validate_template_key(123)  # type: ignore[arg-type]
+
+
+def test_normalize_template_repo_value_invalid_key_and_custom_repo():
+    assert normalize_template_repo_value(None, template_key="invalid-key") is None
+    assert (
+        normalize_template_repo_value("custom/repo", template_key="invalid-key")
+        == "custom/repo"
+    )

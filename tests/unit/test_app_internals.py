@@ -93,3 +93,19 @@ def test_create_app_adds_proxy_headers(monkeypatch):
 
     create_app()
     assert "ProxyHeadersMiddleware" in calls
+
+
+@pytest.mark.asyncio
+async def test_lifespan_calls_init_db(monkeypatch):
+    from app.api import main as api_main
+
+    called = False
+
+    async def fake_init():
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(api_main, "init_db_if_needed", fake_init)
+    async with api_main.lifespan(create_app()):
+        pass
+    assert called is True
