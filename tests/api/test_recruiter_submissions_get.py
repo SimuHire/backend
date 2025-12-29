@@ -184,7 +184,9 @@ async def test_recruiter_list_includes_links(async_client, async_session: AsyncS
         headers={"x-dev-user-email": recruiter.email},
     )
     assert resp.status_code == 200, resp.text
-    items = resp.json()["items"]
+    body = resp.json()
+    assert set(body.keys()) == {"items"}
+    items = body["items"]
     found = next(i for i in items if i["submissionId"] == sub.id)
     assert found["repoFullName"] == "org/repo"
     assert found["workflowRunId"] == "555"

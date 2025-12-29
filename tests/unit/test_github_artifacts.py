@@ -102,3 +102,74 @@ async def test_parse_artifacts_skips_expired():
     runner = GithubActionsRunner(client, workflow_file="ci.yml")
     parsed = await runner._parse_artifacts("org/repo", 10)
     assert parsed is None
+
+
+def test_parse_test_results_handles_malformed_json_gracefully():
+    """Invalid JSON artifacts should not raise; return None instead."""
+    buf = io.BytesIO()
+    with ZipFile(buf, "w") as zf:
+        zf.writestr("simuhire-test-results.json", "{not-json")
+    parsed = parse_test_results_zip(buf.getvalue())
+    assert parsed is None
+
+
+def test_parse_test_results_junit_fallback():
+    """JUnit XML should be parsed when JSON artifacts are absent."""
+    junit_xml = """
+    <testsuite name="suite">
+        <testcase classname="c" name="pass"/>
+        <testcase classname="c" name="fail"><failure/></testcase>
+    </testsuite>
+    """
+    buf = io.BytesIO()
+    with ZipFile(buf, "w") as zf:
+        zf.writestr("results.xml", junit_xml)
+
+    parsed = parse_test_results_zip(buf.getvalue())
+    assert parsed
+    assert parsed.passed == 1
+    assert parsed.failed == 1
+    assert parsed.total == 2
+    assert parsed.summary == {"format": "junit"}
+
+
+async def test_parse_artifacts_handles_bad_zip_without_crashing():
+    """Corrupted artifacts should be ignored instead of raising."""
+    client = _StubClient(
+        artifacts=[{"id": 1, "name": "simuhire-test-results"}],
+        contents={1: b"this-is-not-a-zip"},
+    )
+    runner = GithubActionsRunner(client, workflow_file="ci.yml")
+    parsed = await runner._parse_artifacts("org/repo", 42)
+    assert parsed is None
+
+
+def test_parse_test_results_json_fallback_and_bad_xml():
+    """Non-preferred JSON should be parsed; invalid XML ignored."""
+    buf = io.BytesIO()
+    with ZipFile(buf, "w") as zf:
+        zf.writestr("other.json", '{"passed":3,"failed":1,"total":4,"summary":{"s":1}}')
+        zf.writestr("broken.xml", "<testsuite><testcase></testsuite")
+
+    parsed = parse_test_results_zip(buf.getvalue())
+    assert (
+        parsed
+        and parsed.passed == 3
+        and parsed.total == 4
+        and parsed.summary == {"s": 1}
+    )
+
+
+def test_parse_test_results_bad_xml_only_returns_none():
+    buf = io.BytesIO()
+    with ZipFile(buf, "w") as zf:
+        zf.writestr("only.xml", "<testsuite><bad")
+    assert parse_test_results_zip(buf.getvalue()) is None
+
+
+def test_safe_json_load_returns_none_for_non_dict():
+    buf = io.BytesIO()
+    with ZipFile(buf, "w") as zf:
+        zf.writestr("array.json", "[1,2,3]")
+    parsed = parse_test_results_zip(buf.getvalue())
+    assert parsed is None

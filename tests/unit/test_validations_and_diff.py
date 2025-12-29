@@ -64,3 +64,14 @@ def test_summarize_diff_includes_base_head():
     )
     assert summary["base"] == "base123"
     assert summary["head"] == "head123"
+
+
+def test_validate_run_allowed_blocks_non_code_tasks():
+    class FakeTask:
+        def __init__(self, task_type):
+            self.type = task_type
+
+    with pytest.raises(HTTPException):
+        svc.validate_run_allowed(FakeTask("design"))
+    # code tasks are allowed
+    svc.validate_run_allowed(FakeTask("code"))
