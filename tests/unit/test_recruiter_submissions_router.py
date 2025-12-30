@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes.recruiter import submissions as recruiter_submissions
+from app.api.routes import submissions as recruiter_submissions
 
 
 @pytest.mark.asyncio

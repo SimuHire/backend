@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes.candidate import sessions as candidate_sessions
+from app.api.routes import candidate_sessions
 
 
 class StubSession:

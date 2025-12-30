@@ -10,12 +10,12 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.api.routes.candidate import submissions as candidate_submissions
-from app.core.db import get_session
-from app.core.security.current_user import get_current_user
-from app.domain import Base, User
+from app.api.routes import tasks_codespaces as candidate_submissions
+from app.domains import Base, User
+from app.domains.github_native.actions_runner import ActionsRunResult
+from app.infra.db import get_session
+from app.infra.security.current_user import get_current_user
 from app.main import app
-from app.services.github.actions import ActionsRunResult
 
 
 @pytest.fixture(scope="session")

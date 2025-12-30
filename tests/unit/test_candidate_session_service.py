@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import HTTPException
 
-from app.domain.candidate_sessions import service as cs_service
+from app.domains.candidate_sessions import service as cs_service
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

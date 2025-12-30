@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.domain import CandidateSession
-from app.domain.simulations import service as sim_service
+from app.domains import CandidateSession
+from app.domains.simulations import service as sim_service
 from tests.factories import create_recruiter, create_simulation
 
 

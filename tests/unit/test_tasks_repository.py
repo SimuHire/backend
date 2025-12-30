@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.simulations import tasks_repository
+from app.domains.tasks import repository as tasks_repository
 from tests.factories import create_recruiter, create_simulation
 
 

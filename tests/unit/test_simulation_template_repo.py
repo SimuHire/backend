@@ -1,4 +1,4 @@
-from app.domain.simulations.service import _template_repo_for_task
+from app.domains.simulations.service import _template_repo_for_task
 from tests.factories import create_recruiter, create_simulation
 
 

@@ -3,8 +3,8 @@ import json
 import pytest
 from sqlalchemy import delete, select
 
-from app.domain import Submission, Task
-from app.services.github.actions import ActionsRunResult
+from app.domains import Submission, Task
+from app.domains.github_native.actions_runner import ActionsRunResult
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

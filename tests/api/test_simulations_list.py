@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 
-from app.core.security.current_user import get_current_user
-from app.domain import CandidateSession, Company, User
+from app.domains import CandidateSession, Company, User
+from app.infra.security.current_user import get_current_user
 
 
 @pytest_asyncio.fixture
@@ -140,7 +140,7 @@ async def test_list_simulations_does_not_show_other_users(authed_client, async_s
     await async_session.flush()
 
     # Create simulation for other user (direct insert)
-    from app.domain.simulations.simulation import Simulation
+    from app.domains.simulations.simulation import Simulation
 
     other_sim = Simulation(
         title="Other User Sim",

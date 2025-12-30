@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.submissions import service_recruiter as svc
+from app.domains.submissions import service_recruiter as svc
 
 
 def test_derive_test_status_variants():

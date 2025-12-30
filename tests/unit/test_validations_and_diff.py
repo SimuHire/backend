@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from app.domain.submissions import service_candidate as svc
+from app.domains.submissions import service_candidate as svc
 
 
 def test_validate_github_username_allows_standard():

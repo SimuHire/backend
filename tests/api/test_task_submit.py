@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import CandidateSession, Company, Submission, User
+from app.domains import CandidateSession, Company, Submission, User
 
 
 async def seed_recruiter(

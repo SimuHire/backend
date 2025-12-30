@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import hypothesis.strategies as st
 from hypothesis import given
 
-from app.domain.candidate_sessions.progress import (
+from app.domains.candidate_sessions.progress import (
     compute_current_task,
     summarize_progress,
 )

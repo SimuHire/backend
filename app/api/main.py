@@ -4,14 +4,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, health
-from app.api.routes.candidate import sessions as candidate_sessions
-from app.api.routes.candidate import submissions as candidate_submissions
-from app.api.routes.recruiter import simulations as recruiter_simulations
-from app.api.routes.recruiter import submissions as recruiter_submissions
-from app.core.config import settings
-from app.core.db import init_db_if_needed
-from app.core.env import env_name
+from app.api.routes import (
+    auth,
+    candidate_sessions,
+    health,
+    simulations,
+    submissions,
+    tasks_codespaces,
+)
+from app.infra.config import settings
+from app.infra.db import init_db_if_needed
+from app.infra.env import env_name
 
 
 def _parse_csv(value: str | None) -> list[str]:
@@ -92,7 +95,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(health.router, prefix="", tags=["health"])
     app.include_router(auth.router, prefix=f"{prefix}/auth", tags=["auth"])
     app.include_router(
-        recruiter_simulations.router,
+        simulations.router,
         prefix=f"{prefix}/simulations",
         tags=["simulations"],
     )
@@ -102,10 +105,10 @@ def _register_routers(app: FastAPI) -> None:
         tags=["candidate"],
     )
     app.include_router(
-        candidate_submissions.router, prefix=f"{prefix}/tasks", tags=["tasks"]
+        tasks_codespaces.router, prefix=f"{prefix}/tasks", tags=["tasks"]
     )
     app.include_router(
-        recruiter_submissions.router,
+        submissions.router,
         prefix=f"{prefix}/submissions",
     )
 

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes.recruiter import simulations as recruiter_sims
+from app.api.routes import simulations as recruiter_sims
 
 
 @pytest.mark.asyncio

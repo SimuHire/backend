@@ -4,9 +4,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.services.github.actions import ActionsRunResult, GithubActionsRunner
-from app.services.github.artifacts import ParsedTestResults
-from app.services.github.client import (
+from app.domains.github_native.actions_runner import (
+    ActionsRunResult,
+    GithubActionsRunner,
+)
+from app.domains.github_native.artifacts import ParsedTestResults
+from app.domains.github_native.client import (
     GithubClient,
     GithubError,
     WorkflowRun,

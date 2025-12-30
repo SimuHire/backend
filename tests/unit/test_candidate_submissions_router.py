@@ -6,15 +6,18 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.dependencies.candidate import CandidateSessionAuth, candidate_headers
-from app.api.routes.candidate import submissions as candidate_submissions
-from app.domain.submissions.schemas import (
+from app.api.dependencies.candidate_sessions import (
+    CandidateSessionAuth,
+    candidate_headers,
+)
+from app.api.routes import tasks_codespaces as candidate_submissions
+from app.domains.github_native.actions_runner import ActionsRunResult
+from app.domains.github_native.client import GithubError
+from app.domains.submissions.schemas import (
     CodespaceInitRequest,
     RunTestsRequest,
     SubmissionCreateRequest,
 )
-from app.services.github.actions import ActionsRunResult
-from app.services.github.client import GithubError
 
 
 def _async_return(val):

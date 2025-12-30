@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import Simulation
-from app.domain.submissions import repository as submissions_repo
+from app.domains import Simulation
+from app.domains.submissions import repository as submissions_repo
 from tests.factories import create_company
 
 
