@@ -42,7 +42,8 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
   - `GET /api/submissions` list submissions (filters `candidateSessionId`, `taskId`)
   - `GET /api/submissions/{id}` detail with content/code/test results + repo/commit/workflow/diff URLs
 - Candidate (token headers):
-  - `GET /api/candidate/session/{token}` resolve invite; sets `in_progress`
+  - `POST /api/candidate/session/{token}/verify` verify invite email, start session, issue short-lived candidate token
+  - `GET /api/candidate/session/{token}` responds 401 (verification required; use `/verify`)
   - `GET /api/candidate/session/{id}/current_task` (header `x-candidate-token`) current task/progress; auto-completes when done
   - `POST /api/tasks/{taskId}/codespace/init` create/return workspace repo + Codespace URL (code/debug tasks)
   - `GET /api/tasks/{taskId}/codespace/status` workspace state (repo/default branch/latest run/test summary)
@@ -54,7 +55,7 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
 ## Typical Flow
 
 1) Recruiter authenticates → `POST /api/simulations` → `POST /api/simulations/{id}/invite` to generate candidate link.
-2) Candidate opens invite → resolves token → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
+2) Candidate opens invite → verifies email to get candidate token → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
 3) Recruiter views submissions list/detail with repo/workflow/commit/diff/test results.
 
 ## Local Development

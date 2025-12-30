@@ -21,6 +21,7 @@ async def test_submit_rejects_expired_session(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
+        access_token="tok-expired",
         expires_in_days=-1,
     )
 
@@ -28,7 +29,7 @@ async def test_submit_rejects_expired_session(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{task_id}/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "should fail"},
@@ -44,6 +45,7 @@ async def test_submit_after_completion_returns_409(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
+        access_token="tok-done",
     )
 
     # Seed submissions for all tasks to mark sim complete
@@ -60,7 +62,7 @@ async def test_submit_after_completion_returns_409(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{task_id}/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "too late"},
@@ -79,7 +81,10 @@ async def test_submit_returns_500_when_simulation_missing_tasks(
     recruiter = await create_recruiter(async_session, email="notasks@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-notasks",
     )
 
     # Remove tasks to exercise guard
@@ -89,7 +94,7 @@ async def test_submit_returns_500_when_simulation_missing_tasks(
     res = await async_client.post(
         f"/api/tasks/{tasks[0].id}/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "should error"},
@@ -102,13 +107,16 @@ async def test_submit_task_not_found(async_client, async_session):
     recruiter = await create_recruiter(async_session, email="missingtask@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-missing",
     )
 
     res = await async_client.post(
         "/api/tasks/999999/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "no task"},
@@ -122,14 +130,17 @@ async def test_submit_task_from_other_simulation(async_client, async_session):
     sim_a, tasks_a = await create_simulation(async_session, created_by=recruiter)
     sim_b, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim_b, status="in_progress"
+        async_session,
+        simulation=sim_b,
+        status="in_progress",
+        access_token="tok-cross",
     )
 
     # Use task from sim_a with session from sim_b -> 404
     res = await async_client.post(
         f"/api/tasks/{tasks_a[0].id}/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "wrong sim"},
@@ -142,7 +153,10 @@ async def test_submit_unknown_task_type_errors(async_client, async_session):
     recruiter = await create_recruiter(async_session, email="unk@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-unknown",
     )
 
     # Manually insert a task with unsupported type
@@ -167,7 +181,7 @@ async def test_submit_unknown_task_type_errors(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{bad_task.id}/submit",
         headers={
-            "x-candidate-token": cs.token,
+            "x-candidate-token": cs.access_token,
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "unknown"},
@@ -182,7 +196,10 @@ async def test_submit_code_task_persists_actions_results(
     recruiter = await create_recruiter(async_session, email="code-submit@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-wrong-sim",
     )
     # Seed day 1 submission to unlock day 2 code task
     await create_submission(
@@ -206,7 +223,7 @@ async def test_submit_code_task_persists_actions_results(
         )
     )
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,
@@ -255,10 +272,13 @@ async def test_submit_text_task_leaves_test_fields_null(
     recruiter = await create_recruiter(async_session, email="text-submit@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-text-submit",
     )
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     resp = await async_client.post(
         f"/api/tasks/{tasks[0].id}/submit",
         headers=headers,
@@ -280,7 +300,10 @@ async def test_submit_code_task_actions_error_returns_502_no_submission(
     recruiter = await create_recruiter(async_session, email="actions-err@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-actions-err",
     )
     # seed day 1 to reach day 2 code task
     await create_submission(
@@ -293,7 +316,7 @@ async def test_submit_code_task_actions_error_returns_502_no_submission(
 
     actions_stubber(error=Boom("boom"))
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,

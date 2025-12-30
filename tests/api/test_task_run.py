@@ -24,7 +24,10 @@ async def test_codespace_init_works_for_debug_task(
     recruiter = await create_recruiter(async_session, email="debug-task@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-debug",
     )
     # Complete earlier tasks to allow day 3 debug
     await create_submission(
@@ -35,7 +38,7 @@ async def test_codespace_init_works_for_debug_task(
     )
     await async_session.commit()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     resp = await async_client.post(
         f"/api/tasks/{tasks[2].id}/codespace/init",
         headers=headers,
@@ -56,7 +59,10 @@ async def test_codespace_init_missing_template_repo_returns_500(
     recruiter = await create_recruiter(async_session, email="missing-template@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-missing-template",
     )
     # Complete earlier tasks to allow day 3 debug
     await create_submission(
@@ -69,7 +75,7 @@ async def test_codespace_init_missing_template_repo_returns_500(
     tasks[2].template_repo = None
     await async_session.commit()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     resp = await async_client.post(
         f"/api/tasks/{tasks[2].id}/codespace/init",
         headers=headers,
@@ -87,7 +93,10 @@ async def test_codespace_init_reuses_existing_workspace_and_skips_github(
     recruiter = await create_recruiter(async_session, email="reuse@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-reuse",
     )
     # Complete day 1 to unlock day 2 code task
     await create_submission(
@@ -136,7 +145,7 @@ async def test_codespace_init_reuses_existing_workspace_and_skips_github(
     with override_dependencies(
         {candidate_submissions.get_github_client: lambda: CountingGithubClient()}
     ):
-        headers = candidate_header_factory(cs.id, cs.token)
+        headers = candidate_header_factory(cs.id, cs.access_token)
         resp = await async_client.post(
             f"/api/tasks/{tasks[1].id}/codespace/init",
             headers=headers,
@@ -164,7 +173,10 @@ async def test_codespace_init_maps_github_errors_to_502(
     recruiter = await create_recruiter(async_session, email="gh-error@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-gh-error",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -178,7 +190,7 @@ async def test_codespace_init_maps_github_errors_to_502(
     with override_dependencies(
         {candidate_submissions.get_github_client: lambda: ErrorGithubClient()}
     ):
-        headers = candidate_header_factory(cs.id, cs.token)
+        headers = candidate_header_factory(cs.id, cs.access_token)
         resp = await async_client.post(
             f"/api/tasks/{tasks[1].id}/codespace/init",
             headers=headers,
@@ -196,7 +208,10 @@ async def test_run_tests_returns_actions_result(
     recruiter = await create_recruiter(async_session, email="run-tests@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-run",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -218,7 +233,7 @@ async def test_run_tests_returns_actions_result(
     )
     actions_stubber(result=stub_result)
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     # Init workspace first
     init_resp = await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
@@ -256,7 +271,10 @@ async def test_run_tests_rate_limited_when_prod_env(
     recruiter = await create_recruiter(async_session, email="rate@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-rate",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -264,7 +282,7 @@ async def test_run_tests_rate_limited_when_prod_env(
     await async_session.commit()
 
     actions_stubber()
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,
@@ -297,13 +315,16 @@ async def test_run_tests_invalid_task_404(
     recruiter = await create_recruiter(async_session, email="run-404@sim.com")
     sim, _tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-run-404",
     )
     await async_session.commit()
 
     actions_stubber()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     resp = await async_client.post(
         "/api/tasks/99999/run",
         headers=headers,
@@ -327,7 +348,10 @@ async def test_run_tests_handles_actions_error(
     recruiter = await create_recruiter(async_session, email="actions-error@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-actions-error",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -339,7 +363,7 @@ async def test_run_tests_handles_actions_error(
 
     actions_stubber(error=Boom("boom"))
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,
@@ -362,7 +386,10 @@ async def test_codespace_status_returns_summary(
     recruiter = await create_recruiter(async_session, email="status@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-status",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -383,7 +410,7 @@ async def test_codespace_status_returns_summary(
     workspace.last_test_summary_json = "{not-json"
     await async_session.commit()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     resp = await async_client.get(
         f"/api/tasks/{tasks[1].id}/codespace/status",
         headers=headers,
@@ -402,14 +429,17 @@ async def test_get_run_result_returns_parsed_counts(
     recruiter = await create_recruiter(async_session, email="run-get@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-run-get",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
     )
     await async_session.commit()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,
@@ -451,14 +481,17 @@ async def test_get_run_result_marks_timeout(
     recruiter = await create_recruiter(async_session, email="run-timeout@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-run-timeout",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
     )
     await async_session.commit()
 
-    headers = candidate_header_factory(cs.id, cs.token)
+    headers = candidate_header_factory(cs.id, cs.access_token)
     await async_client.post(
         f"/api/tasks/{tasks[1].id}/codespace/init",
         headers=headers,
@@ -483,7 +516,10 @@ async def test_get_run_result_github_error_maps_to_502(
     recruiter = await create_recruiter(async_session, email="run-fetch-err@sim.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-run-fetch",
     )
     await create_submission(
         async_session, candidate_session=cs, task=tasks[0], content_text="day1"
@@ -526,7 +562,7 @@ async def test_get_run_result_github_error_maps_to_502(
             candidate_submissions.get_github_client: lambda: StubGithubClient(),
         }
     ):
-        headers = candidate_header_factory(cs.id, cs.token)
+        headers = candidate_header_factory(cs.id, cs.access_token)
         await async_client.post(
             f"/api/tasks/{tasks[1].id}/codespace/init",
             headers=headers,

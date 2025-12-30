@@ -41,6 +41,19 @@ class CandidateSessionResolveResponse(APIModel):
     simulation: CandidateSimulationSummary
 
 
+class CandidateSessionVerifyRequest(APIModel):
+    """Schema for verifying invite email for a candidate session."""
+
+    email: EmailStr
+
+
+class CandidateSessionVerifyResponse(CandidateSessionResolveResponse):
+    """Session details plus a short-lived candidate token."""
+
+    candidateToken: str
+    tokenExpiresAt: datetime
+
+
 class ProgressSummary(APIModel):
     """Summary of progress for the candidate session."""
 

@@ -1,12 +1,14 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Path
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.candidate_sessions.schemas import (
     CandidateSessionResolveResponse,
+    CandidateSessionVerifyRequest,
+    CandidateSessionVerifyResponse,
     CandidateSimulationSummary,
     CurrentTaskResponse,
     ProgressSummary,
@@ -22,25 +24,37 @@ async def resolve_candidate_session(
     token: Annotated[str, Path(..., min_length=20, max_length=255)],
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> CandidateSessionResolveResponse:
-    """Resolve an invite token into a candidate session context.
+    """Reject invite-only access; require email verification step."""
+    await cs_service.fetch_by_token(db, token, now=datetime.now(UTC))
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Email verification required",
+    )
 
-    No auth: possession of the token is the access mechanism.
-    On first access, transitions status from not_started -> in_progress and sets started_at.
-    If expired, returns 410 with a safe error message.
-    """
+
+@router.post(
+    "/session/{token}/verify",
+    response_model=CandidateSessionVerifyResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def verify_candidate_session(
+    token: Annotated[str, Path(..., min_length=20, max_length=255)],
+    payload: CandidateSessionVerifyRequest,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> CandidateSessionVerifyResponse:
+    """Verify invite email and issue a short-lived candidate token."""
     now = datetime.now(UTC)
-    cs = await cs_service.fetch_by_token(db, token, now=now)
-
-    if cs.status == "not_started":
-        cs.status = "in_progress"
-        if cs.started_at is None:
-            cs.started_at = now
-        await db.commit()
-        await db.refresh(cs)
+    cs = await cs_service.verify_email_and_issue_token(
+        db, token, str(payload.email).lower(), now=now
+    )
+    # Ensure related simulation is loaded without triggering lazy IO later.
+    await db.refresh(cs, attribute_names=["simulation"])
 
     sim = cs.simulation
-    return CandidateSessionResolveResponse(
+    return CandidateSessionVerifyResponse(
         candidateSessionId=cs.id,
+        candidateToken=cs.access_token,
+        tokenExpiresAt=cs.access_token_expires_at,
         status=cs.status,
         startedAt=cs.started_at,
         completedAt=cs.completed_at,

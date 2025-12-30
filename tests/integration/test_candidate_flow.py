@@ -37,13 +37,18 @@ async def test_full_flow_invite_through_first_submission(
     assert invite_res.status_code == 201, invite_res.text
     invite = invite_res.json()
 
-    resolve_res = await async_client.get(f"/api/candidate/session/{invite['token']}")
-    assert resolve_res.status_code == 200, resolve_res.text
-    cs_id = resolve_res.json()["candidateSessionId"]
+    verify_res = await async_client.post(
+        f"/api/candidate/session/{invite['token']}/verify",
+        json={"email": "flow@example.com"},
+    )
+    assert verify_res.status_code == 200, verify_res.text
+    verify_body = verify_res.json()
+    cs_id = verify_body["candidateSessionId"]
+    candidate_token = verify_body["candidateToken"]
 
     current_res = await async_client.get(
         f"/api/candidate/session/{cs_id}/current_task",
-        headers={"x-candidate-token": invite["token"]},
+        headers={"x-candidate-token": candidate_token},
     )
     assert current_res.status_code == 200, current_res.text
     assert current_res.json()["currentDayIndex"] == 1
@@ -52,7 +57,7 @@ async def test_full_flow_invite_through_first_submission(
     submit_res = await async_client.post(
         f"/api/tasks/{day1_task_id}/submit",
         headers={
-            "x-candidate-token": invite["token"],
+            "x-candidate-token": candidate_token,
             "x-candidate-session-id": str(cs_id),
         },
         json={"contentText": "Day 1 answer"},

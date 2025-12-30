@@ -29,6 +29,13 @@ class CandidateSession(Base):
         String(255), unique=True, index=True, nullable=False
     )
 
+    access_token: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
+    access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     status: Mapped[str] = mapped_column(String(50), nullable=False)
 
     started_at: Mapped[datetime | None] = mapped_column(

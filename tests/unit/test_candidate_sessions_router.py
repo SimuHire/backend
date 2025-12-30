@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from app.api.routes import candidate_sessions
 
@@ -16,12 +17,12 @@ class StubSession:
     async def commit(self):
         self.committed = True
 
-    async def refresh(self, _obj):
+    async def refresh(self, _obj, **_kwargs):
         self.refreshed = True
 
 
 @pytest.mark.asyncio
-async def test_resolve_candidate_session_sets_started(monkeypatch):
+async def test_resolve_candidate_session_requires_verification(monkeypatch):
     stub_db = StubSession()
     cs = SimpleNamespace(
         id=1,
@@ -36,15 +37,9 @@ async def test_resolve_candidate_session_sets_started(monkeypatch):
         return cs
 
     monkeypatch.setattr(candidate_sessions.cs_service, "fetch_by_token", _return_cs)
-    result = await candidate_sessions.resolve_candidate_session(
-        token="t" * 24, db=stub_db
-    )
-    assert stub_db.committed is True
-    assert stub_db.refreshed is True
-    assert result.status == "in_progress"
-    assert cs.started_at is not None
-    assert isinstance(result.startedAt, datetime)
-    assert cs.started_at.tzinfo == UTC
+    with pytest.raises(HTTPException) as excinfo:
+        await candidate_sessions.resolve_candidate_session(token="t" * 24, db=stub_db)
+    assert excinfo.value.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -89,3 +84,37 @@ async def test_get_current_task_marks_completed(monkeypatch):
     assert cs.status == "completed"
     assert stub_db.committed is True
     assert cs.completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_verify_candidate_session_returns_token(monkeypatch):
+    stub_db = StubSession()
+    expires_at = datetime.now(UTC)
+    cs = SimpleNamespace(
+        id=3,
+        status="in_progress",
+        completed_at=None,
+        started_at=expires_at,
+        candidate_name="Jane",
+        access_token="access",
+        access_token_expires_at=expires_at,
+        simulation=SimpleNamespace(id=10, title="Sim", role="Backend"),
+    )
+
+    async def _verify(db, token, email, now):
+        assert token == "t" * 24
+        assert email == "test@example.com"
+        assert isinstance(now, datetime)
+        return cs
+
+    monkeypatch.setattr(
+        candidate_sessions.cs_service, "verify_email_and_issue_token", _verify
+    )
+
+    resp = await candidate_sessions.verify_candidate_session(
+        token="t" * 24, payload=SimpleNamespace(email="test@example.com"), db=stub_db
+    )
+
+    assert resp.candidateToken == cs.access_token
+    assert resp.tokenExpiresAt == expires_at
+    assert resp.candidateName == cs.candidate_name

@@ -20,12 +20,17 @@ async def test_resolve_session_transitions_to_in_progress(async_client, async_se
     assert cs.status == "not_started"
     assert cs.started_at is None
 
-    res = await async_client.get(f"/api/candidate/session/{cs.token}")
+    res = await async_client.post(
+        f"/api/candidate/session/{cs.token}/verify",
+        json={"email": cs.invite_email},
+    )
     assert res.status_code == 200, res.text
 
     body = res.json()
     assert body["status"] == "in_progress"
     assert body["candidateSessionId"] == cs.id
+    assert body["candidateToken"]
+    assert body["tokenExpiresAt"]
 
     await async_session.refresh(cs)
     assert cs.status == "in_progress"
@@ -42,6 +47,7 @@ async def test_current_task_marks_complete_when_all_tasks_done(
         async_session,
         simulation=sim,
         status="in_progress",
+        access_token="tok-complete",
         started_at=datetime.now(UTC) - timedelta(hours=1),
     )
 
@@ -56,7 +62,7 @@ async def test_current_task_marks_complete_when_all_tasks_done(
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.token},
+        headers={"x-candidate-token": cs.access_token},
     )
     assert res.status_code == 200, res.text
 
@@ -80,12 +86,13 @@ async def test_get_current_task_respects_expiry(async_client, async_session):
         simulation=sim,
         expires_in_days=-1,
         status="in_progress",
+        access_token="tok-expired",
         started_at=datetime.now(UTC) - timedelta(days=2),
     )
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.token},
+        headers={"x-candidate-token": cs.access_token},
     )
     assert res.status_code == 410
 
@@ -116,7 +123,10 @@ async def test_current_task_token_mismatch(async_client, async_session):
     recruiter = await create_recruiter(async_session, email="tm@test.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-mismatch",
     )
 
     res = await async_client.get(
@@ -131,7 +141,10 @@ async def test_current_task_no_tasks_returns_500(async_client, async_session):
     recruiter = await create_recruiter(async_session, email="notasks@test.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
-        async_session, simulation=sim, status="in_progress"
+        async_session,
+        simulation=sim,
+        status="in_progress",
+        access_token="tok-notasks",
     )
 
     # Remove all tasks to trigger guard
@@ -142,6 +155,6 @@ async def test_current_task_no_tasks_returns_500(async_client, async_session):
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.token},
+        headers={"x-candidate-token": cs.access_token},
     )
     assert res.status_code == 500
