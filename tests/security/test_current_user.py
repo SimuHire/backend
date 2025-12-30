@@ -1,8 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
-from app.core.db import get_session
-from app.core.security import auth0, current_user
+from app.infra.db import get_session
+from app.infra.security import auth0, current_user
 from app.main import app
 
 

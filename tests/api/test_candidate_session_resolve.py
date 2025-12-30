@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.domain import CandidateSession, Company, Submission, Task, User
+from app.domains import CandidateSession, Company, Submission, Task, User
 
 # -------------------------
 # Shared helpers (mirrors resolve tests)

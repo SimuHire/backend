@@ -110,9 +110,9 @@ Key env vars (see `.env`):
 
 ## Code Structure
 
-- `app/api` FastAPI routers and application factory
-- `app/core` settings, DB session factory, security utilities
-- `app/domain` ORM models, schemas, repositories, and services (simulations, candidate_sessions, submissions, users, companies)
+- `app/api` FastAPI application factory + routers grouped by domain (`simulations`, `candidate_sessions`, `tasks_codespaces`, `submissions`)
+- `app/infra` settings, env helpers, DB session factory, and security utilities
+- `app/domains` domain modules (simulations, tasks, candidate_sessions, submissions, github_native/workspaces, users, companies, common)
 - `alembic` migrations; `scripts/` helpers; `tests/` api/unit/integration/property suites
 
 ## Typical Flows

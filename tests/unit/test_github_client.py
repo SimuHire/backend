@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from app.services.github.client import GithubClient, GithubError
+from app.domains.github_native.client import GithubClient, GithubError
 
 
 def _mock_client(handler) -> GithubClient:

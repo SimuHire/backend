@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.domain import Task
+from app.domains import Task
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

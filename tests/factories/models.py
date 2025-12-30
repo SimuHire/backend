@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import CandidateSession, Company, Simulation, Submission, Task, User
-from app.domain.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
-from app.services.template_catalog import (
+from app.domains import CandidateSession, Company, Simulation, Submission, Task, User
+from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
+from app.domains.tasks.template_catalog import (
     DEFAULT_TEMPLATE_KEY,
     resolve_template_repo_full_name,
 )

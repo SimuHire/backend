@@ -1,4 +1,4 @@
-from app.core import db
+from app.infra import db
 
 
 def test_create_engine_uses_sqlite_fallback(monkeypatch):

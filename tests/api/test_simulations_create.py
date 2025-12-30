@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy import select
 
-from app.core.security.current_user import get_current_user
-from app.domain import Company, Task, User
+from app.domains import Company, Task, User
+from app.infra.security.current_user import get_current_user
 
 
 @pytest.mark.asyncio
@@ -144,7 +144,7 @@ async def test_create_simulation_with_template_key_persists(
         assert data["templateKey"] == "monorepo-nextjs-fastapi"
 
         sim_id = data["id"]
-        from app.domain.simulations.simulation import Simulation
+        from app.domains.simulations.simulation import Simulation
 
         saved = await async_session.get(Simulation, sim_id)
         assert saved is not None

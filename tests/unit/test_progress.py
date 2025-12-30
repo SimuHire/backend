@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.domain.candidate_sessions.progress import (
+from app.domains.candidate_sessions.progress import (
     compute_current_task,
     summarize_progress,
 )

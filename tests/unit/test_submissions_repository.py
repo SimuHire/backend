@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.domain.submissions import repository as submissions_repo
+from app.domains.submissions import repository as submissions_repo
 from tests.factories import (
     create_candidate_session,
     create_recruiter,
