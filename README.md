@@ -1,129 +1,88 @@
 # SimuHire Backend
 
-FastAPI + Postgres backend for SimuHire, a simulation-based hiring platform. Recruiters create 5-day simulations, invite candidates, and review their task submissions. Candidates progress through tasks via signed tokens (no password flow).
+FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, invite candidates, and review GitHub-native task submissions. Candidates work entirely in GitHub (template repos + Codespaces + Actions) and authenticate via invite tokens.
+
+## GitHub-Native Execution
+
+- Template catalog source of truth: `app/domains/tasks/template_catalog.py` maps `templateKey` → template repo (`owner/name`). Code/debug tasks pull their template from the simulation’s `templateKey`.
+- Workflow expectations: `GITHUB_ACTIONS_WORKFLOW_FILE` must exist in each template repo and support `workflow_dispatch`. Artifact contract: preferred artifact name `simuhire-test-results` (case-insensitive) containing `simuhire-test-results.json` with `{passed, failed, total, stdout, stderr, summary?}`. Fallback: any JSON with those keys, else JUnit XML.
+- Flow: backend provisions a workspace repo from the template → returns Codespace URL → triggers/polls Actions runs → parses artifacts → stores run/test/diff metadata on `Workspace` and `Submission`. Diff summary computed via GitHub compare (base template SHA → head commit).
 
 ## Architecture
 
-- **Framework**: FastAPI (async) with SQLAlchemy 2.0 and Alembic.
-- **Auth**: Auth0 JWTs (bearer) with local/test bypass via `DEV_AUTH_BYPASS` + `x-dev-user-email`.
-- **DB**: Postgres (asyncpg); falls back to SQLite `local.db` if no DB URL is set.
-- **Domains**:
-  - Simulations: recruiter-owned configs seeded with a default 5-day blueprint.
-  - Tasks: per-day tasks (design/code/debug/handoff/documentation).
-  - Candidate Sessions: invite tokens, expiry, progress state.
-  - Submissions: per-task artifacts (text/code) with optional stored test results.
-  - Execution Profiles: report placeholder linked 1:1 to a candidate session (creation not implemented).
-- **API layout**: `app/api/routes/*` grouped by recruiter vs candidate; services live in `app/domain/**/service*.py`.
+- FastAPI app factory `app/api/main.py` with CORS/proxy middleware; routers in `app/api/routes`.
+- Infra: settings `app/infra/config.py`, env helpers `app/infra/env.py`, DB `app/infra/db` (async SQLAlchemy + SQLite fallback), security `app/infra/security/*` (Auth0 JWT + local dev bypass).
+- Domains: `app/domains/*`
+  - Simulations (`simulations/*`): model, create/list, invite creation.
+  - Tasks (`tasks/*`): task model, template catalog, public schemas.
+  - Candidate Sessions (`candidate_sessions/*`): token-based invites, progress helpers.
+  - Submissions (`submissions/*`): submission model/services (candidate + recruiter), run/diff helpers, schemas, exceptions.
+  - GitHub Native (`github_native/*`): REST client, Actions runner, artifact parsing, workspace model/repo.
+  - Users/Companies (`users`, `companies`), Common types/schemas.
+- Data model highlights: `Simulation` → `Task` (5-day blueprint seeded on create); `Simulation` → `CandidateSession` (token, status, timestamps, expires_at); `CandidateSession` → `Submission` (one per task, stores code repo/run/diff/test info); `CandidateSession` → `Workspace` (GitHub repo metadata, last run info); `ExecutionProfile` placeholder for future reports.
 
-## Domain Concepts
+## Domain Glossary
 
-- **Simulation**: A 5-day scenario with ordered tasks and metadata (role, techStack, focus).
-- **Task**: A single day’s assignment; type drives submission validation.
-- **Candidate Session**: Invitation for a candidate; secured by token; tracks started/completed timestamps and expiry.
-- **Submission**: Candidate’s response for a task; enforces one-per-task per session; stores text/code and test result fields.
-- **Execution Profile**: Future report of performance; model exists but no generation pipeline yet.
+- Simulation: recruiter-owned scenario with role/techStack/focus/templateKey.
+- Task: daily assignment; type drives validation (`design`, `code`, `debug`, `handoff`, `documentation`).
+- Candidate Session: invite for a candidate; secured by token; tracks progress/expiry.
+- Workspace: GitHub repo generated from template for a candidate+task; stores last Actions results.
+- Submission: final turn-in for a task with optional test results and diff summary.
+- Execution Profile: planned evaluation/report entity (model exists; no generation).
 
 ## API Overview
 
-- **Health**: `GET /health`
-- **Auth**: `GET /api/auth/me`
-- **Recruiter – Simulations**
-  - `GET /api/simulations` list owned simulations (+candidate counts)
-  - `POST /api/simulations` create simulation + default tasks
-  - `POST /api/simulations/{simulation_id}/invite` create candidate invite (token/link)
-  - `GET /api/simulations/{simulation_id}/candidates` list sessions (`hasReport` if an execution_profile exists)
-- **Candidate**
+- Health: `GET /health`
+- Auth: `GET /api/auth/me` (Auth0 or dev bypass)
+- Recruiter (Auth0/dev bypass; recruiter role):
+  - `GET /api/simulations` list owned (with candidate counts)
+  - `POST /api/simulations` create + seed 5 tasks (uses `templateKey`)
+  - `POST /api/simulations/{id}/invite` create candidate token/link
+  - `GET /api/simulations/{id}/candidates` list sessions (`hasReport` if `execution_profiles` row)
+  - `GET /api/submissions` list submissions (filters `candidateSessionId`, `taskId`)
+  - `GET /api/submissions/{id}` detail with content/code/test results + repo/commit/workflow/diff URLs
+- Candidate (token headers):
   - `GET /api/candidate/session/{token}` resolve invite; sets `in_progress`
-  - `GET /api/candidate/session/{id}/current_task` (header `x-candidate-token`) returns current task, progress; auto-completes if done
-  - Codespaces: `POST /api/tasks/{task_id}/codespace/init` provisions a GitHub template repo for the task; `GET /api/tasks/{task_id}/codespace/status` reports latest workflow state.
-  - Runs/Submissions: `POST /api/tasks/{task_id}/run` triggers GitHub Actions tests on the workspace; `POST /api/tasks/{task_id}/submit` records final results (GitHub Actions conclusions + diff summary).
-- **Recruiter – Submissions**
-  - `GET /api/submissions` (optional `candidateSessionId`, `taskId`) list for owned simulations
-  - `GET /api/submissions/{submission_id}` fetch submission detail (content/code/test results, commit/workflow metadata)
+  - `GET /api/candidate/session/{id}/current_task` (header `x-candidate-token`) current task/progress; auto-completes when done
+  - `POST /api/tasks/{taskId}/codespace/init` create/return workspace repo + Codespace URL (code/debug tasks)
+  - `GET /api/tasks/{taskId}/codespace/status` workspace state (repo/default branch/latest run/test summary)
+  - `POST /api/tasks/{taskId}/run` trigger Actions tests; returns normalized run result
+  - `GET /api/tasks/{taskId}/run/{runId}` fetch prior run result
+  - `POST /api/tasks/{taskId}/submit` submit task (runs tests for code tasks, stores run/diff/test info)
+- Errors: 401 missing candidate headers; 400 invalid branch/non-code run/no workspace; 404/410 invalid/expired token; 409 duplicate submission or completed simulation; 429 prod rate limit; 502 GitHub failure.
 
-See `docs/codespaces_actions.md` for Codespaces + Actions setup and artifact contract.
+## Typical Flow
 
-Auth notes:
-
-- Recruiter routes require Auth0 bearer or local bypass header.
-- Candidate routes rely on possession of the invite token; no Auth0.
+1) Recruiter authenticates → `POST /api/simulations` → `POST /api/simulations/{id}/invite` to generate candidate link.
+2) Candidate opens invite → resolves token → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
+3) Recruiter views submissions list/detail with repo/workflow/commit/diff/test results.
 
 ## Local Development
 
-### Prereqs
-
-- Python 3.11+, Poetry, Postgres (or rely on SQLite fallback).
-
-### Setup
-
-```bash
-poetry install
-cp .env.example .env   # or configure env vars directly
-```
-
-(Repo includes a sample `.env`; replace secrets as needed.)
-
-### Run the app
-
-```bash
-# Seed local recruiters (uses SQLite if DB URLs unset)
-ENV=local DEV_AUTH_BYPASS=1 poetry run python scripts/seed_local_recruiters.py
-
-# Start API (Hot reload by default)
-poetry run uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
-# or use the helper: ./runBackend.sh
-```
-
-### Migrations
-
-```bash
-poetry run alembic upgrade head
-```
-
-Alembic reads `alembic.ini` and `DATABASE_URL_SYNC`; fallback SQLite uses `local.db` via startup hook.
-
-### Tests
-
-```bash
-poetry run pytest          # full suite (coverage thresholds enforced)
-poetry run pytest -k api   # focus
-```
+- Prereqs: Python 3.11+, Poetry, Postgres (or SQLite fallback).
+- Install: `poetry install`; configure `.env` (sample included—rotate secrets).
+- Seed dev recruiters: `ENV=local DEV_AUTH_BYPASS=1 poetry run python scripts/seed_local_recruiters.py`.
+- Run: `poetry run uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000` or `./runBackend.sh`.
+- Migrations: `poetry run alembic upgrade head` (uses `DATABASE_URL_SYNC`).
+- Tests: `poetry run pytest` (property tests under `tests/property`).
+- Dev auth: set `DEV_AUTH_BYPASS=1` and send header `x-dev-user-email: recruiter1@local.test` for recruiter endpoints; candidate endpoints use invite token + `x-candidate-token`/`x-candidate-session-id`.
 
 ## Configuration
 
-Key env vars (see `.env`):
+- DB: `DATABASE_URL`, `DATABASE_URL_SYNC` (sync used by Alembic; async derived automatically; SQLite fallback `local.db` if unset).
+- Auth0: `AUTH0_DOMAIN`, `AUTH0_ISSUER`, `AUTH0_JWKS_URL`, `AUTH0_API_AUDIENCE`, `AUTH0_ALGORITHMS`.
+- CORS: `CORS_ALLOW_ORIGINS` (JSON array or comma list), `CORS_ALLOW_ORIGIN_REGEX`.
+- Candidate portal: `CANDIDATE_PORTAL_BASE_URL` (used for invite links).
+- GitHub: `GITHUB_API_BASE`, `GITHUB_ORG`, `GITHUB_TEMPLATE_OWNER`, `GITHUB_REPO_PREFIX`, `GITHUB_ACTIONS_WORKFLOW_FILE`, `GITHUB_TOKEN`, `GITHUB_CLEANUP_ENABLED` (future).
+- Dev bypass: `DEV_AUTH_BYPASS=1` (local only; app aborts otherwise).
 
-- `ENV` (`local`|`test`|`prod`), `API_PREFIX`
-- DB: `DATABASE_URL`, `DATABASE_URL_SYNC`
-- Auth0: `AUTH0_DOMAIN`, `AUTH0_ISSUER`, `AUTH0_JWKS_URL`, `AUTH0_API_AUDIENCE`, `AUTH0_ALGORITHMS`
-- CORS: `CORS_ALLOW_ORIGINS`, `CORS_ALLOW_ORIGIN_REGEX`
-- Candidate portal: `CANDIDATE_PORTAL_BASE_URL` (used to build invite links)
-- GitHub/Codespaces/Actions:
-  - `GITHUB_API_BASE` (default `https://api.github.com`)
-  - `GITHUB_ORG` (or owner for generated repos)
-  - `GITHUB_TOKEN` (bot/app token with repo + actions scope)
-  - `GITHUB_TEMPLATE_OWNER` (fallback owner for templates)
-  - `GITHUB_ACTIONS_WORKFLOW_FILE` (workflow filename/id to dispatch)
-  - `GITHUB_REPO_PREFIX` (prefix for generated candidate repos)
-  - `GITHUB_CLEANUP_ENABLED` (optional cleanup toggle)
-- Dev bypass: `DEV_AUTH_BYPASS=1` enables `x-dev-user-email` on local/test only
+## Roadmap (not implemented yet)
 
-## Code Structure
-
-- `app/api` FastAPI application factory + routers grouped by domain (`simulations`, `candidate_sessions`, `tasks_codespaces`, `submissions`)
-- `app/infra` settings, env helpers, DB session factory, and security utilities
-- `app/domains` domain modules (simulations, tasks, candidate_sessions, submissions, github_native/workspaces, users, companies, common)
-- `alembic` migrations; `scripts/` helpers; `tests/` api/unit/integration/property suites
-
-## Typical Flows
-
-- **Run a simulation**: Recruiter authenticates → `POST /api/simulations` seeds 5 tasks → `POST /api/simulations/{id}/invite` sends tokenized link → Candidate resolves token and progresses through tasks via `current_task` and `submit` → Recruiter reviews submissions.
-- **Submission lifecycle**: Candidate headers include token + session id → server ensures task belongs to session, correct order, and not yet submitted → submission stored; progress recalculated; session marked completed when final task done.
-- **Execution profile (planned)**: `execution_profiles` table exists and `hasReport` flag surfaces in candidate listings, but no generation or AI evaluation is implemented yet.
-
-## Future Work / Gaps
-
-- Harden GitHub App authentication (installation tokens, narrow scopes) and production-grade rate limiting/analytics.
-- Implement AI evaluation/report generation to create `ExecutionProfile` records and expose report data.
-- Candidate authentication beyond bearer token possession (optional).
-- Audit logging/analytics; richer task content (starter code paths/tests currently unused).
+- Pre-provision repos at invite/simulation creation.
+- Invite email verification + notifications.
+- AI scenario generation/evaluation + repo tailoring commits; generate `ExecutionProfile` reports.
+- Day4 media upload pipeline; Day5 structured documentation.
+- Background jobs system.
+- Repo cleanup post-eval.
+- Webhook ingestion + GitHub App auth migration.
+- Structured logging/monitoring/admin metrics; prod deploy plan and disabling dev bypass outside dev.
