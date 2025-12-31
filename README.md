@@ -1,6 +1,6 @@
 # SimuHire Backend
 
-FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, invite candidates, and review GitHub-native task submissions. Candidates work entirely in GitHub (template repos + Codespaces + Actions) and authenticate via invite tokens.
+FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, invite candidates, and review GitHub-native task submissions. Candidates work entirely in GitHub (template repos + Codespaces + Actions) and authenticate via Auth0 access tokens tied to their invites.
 
 ## GitHub-Native Execution
 
@@ -25,7 +25,7 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
 
 - Simulation: recruiter-owned scenario with role/techStack/focus/templateKey.
 - Task: daily assignment; type drives validation (`design`, `code`, `debug`, `handoff`, `documentation`).
-- Candidate Session: invite for a candidate; secured by token; tracks progress/expiry.
+- Candidate Session: invite for a candidate; secured by invite token + Auth0 identity; tracks progress/expiry.
 - Workspace: GitHub repo generated from template for a candidate+task; stores last Actions results.
 - Submission: final turn-in for a task with optional test results and diff summary.
 - Execution Profile: planned evaluation/report entity (model exists; no generation).
@@ -41,21 +41,21 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
   - `GET /api/simulations/{id}/candidates` list sessions (`hasReport` if `execution_profiles` row)
   - `GET /api/submissions` list submissions (filters `candidateSessionId`, `taskId`)
   - `GET /api/submissions/{id}` detail with content/code/test results + repo/commit/workflow/diff URLs
-- Candidate (token headers):
-  - `POST /api/candidate/session/{token}/verify` verify invite email, start session, issue short-lived candidate token
-  - `GET /api/candidate/session/{token}` responds 401 (verification required; use `/verify`)
-  - `GET /api/candidate/session/{id}/current_task` (header `x-candidate-token`) current task/progress; auto-completes when done
-  - `POST /api/tasks/{taskId}/codespace/init` create/return workspace repo + Codespace URL (code/debug tasks)
-  - `GET /api/tasks/{taskId}/codespace/status` workspace state (repo/default branch/latest run/test summary)
-  - `POST /api/tasks/{taskId}/run` trigger Actions tests; returns normalized run result
-  - `GET /api/tasks/{taskId}/run/{runId}` fetch prior run result
-  - `POST /api/tasks/{taskId}/submit` submit task (runs tests for code tasks, stores run/diff/test info)
+- Candidate (Auth0 access token + invite token):
+  - `POST /api/candidate/session/{token}/verify` (Auth0 `Authorization: Bearer <access_token>`) claims invite for the logged-in candidate and transitions to in-progress
+  - `GET /api/candidate/session/{token}` same as verify (idempotent claim/bootstrap with Auth0 identity)
+  - `GET /api/candidate/session/{id}/current_task` (Auth0 bearer + `x-candidate-session-id` optional) current task/progress; auto-completes when done
+  - `POST /api/tasks/{taskId}/codespace/init` (Auth0 bearer) create/return workspace repo + Codespace URL (code/debug tasks)
+  - `GET /api/tasks/{taskId}/codespace/status` (Auth0 bearer) workspace state (repo/default branch/latest run/test summary)
+  - `POST /api/tasks/{taskId}/run` (Auth0 bearer) trigger Actions tests; returns normalized run result
+  - `GET /api/tasks/{taskId}/run/{runId}` (Auth0 bearer) fetch prior run result
+  - `POST /api/tasks/{taskId}/submit` (Auth0 bearer) submit task (runs tests for code tasks, stores run/diff/test info)
 - Errors: 401 missing candidate headers; 400 invalid branch/non-code run/no workspace; 404/410 invalid/expired token; 409 duplicate submission or completed simulation; 429 prod rate limit; 502 GitHub failure.
 
 ## Typical Flow
 
 1) Recruiter authenticates → `POST /api/simulations` → `POST /api/simulations/{id}/invite` to generate candidate link.
-2) Candidate opens invite → verifies email to get candidate token → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
+2) Candidate opens invite while logged in via Auth0 → claims invite (email match required) → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
 3) Recruiter views submissions list/detail with repo/workflow/commit/diff/test results.
 
 ## Local Development
@@ -66,12 +66,13 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
 - Run: `poetry run uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000` or `./runBackend.sh`.
 - Migrations: `poetry run alembic upgrade head` (uses `DATABASE_URL_SYNC`).
 - Tests: `poetry run pytest` (property tests under `tests/property`).
-- Dev auth: set `DEV_AUTH_BYPASS=1` and send header `x-dev-user-email: recruiter1@local.test` for recruiter endpoints; candidate endpoints use invite token + `x-candidate-token`/`x-candidate-session-id`.
+- Dev auth: set `DEV_AUTH_BYPASS=1` and send header `x-dev-user-email: recruiter1@local.test` for recruiter endpoints; candidate endpoints require Auth0 bearer tokens (tests may still use `x-candidate-session-id` helper headers).
 
 ## Configuration
 
 - DB: `DATABASE_URL`, `DATABASE_URL_SYNC` (sync used by Alembic; async derived automatically; SQLite fallback `local.db` if unset).
-- Auth0: `AUTH0_DOMAIN`, `AUTH0_ISSUER`, `AUTH0_JWKS_URL`, `AUTH0_API_AUDIENCE`, `AUTH0_ALGORITHMS`.
+- Auth0: `AUTH0_DOMAIN`, `AUTH0_ISSUER`, `AUTH0_JWKS_URL`, `AUTH0_API_AUDIENCE`, `AUTH0_ALGORITHMS`, `AUTH0_EMAIL_CLAIM`, `AUTH0_ROLES_CLAIM`, `AUTH0_PERMISSIONS_CLAIM`.
+- Auth0 Post Login Action must set `https://simuhire.com/permissions` (and `permissions`) on both access and ID tokens so first-login candidates receive `candidate:access`.
 - CORS: `CORS_ALLOW_ORIGINS` (JSON array or comma list), `CORS_ALLOW_ORIGIN_REGEX`.
 - Candidate portal: `CANDIDATE_PORTAL_BASE_URL` (used for invite links).
 - GitHub: `GITHUB_API_BASE`, `GITHUB_ORG`, `GITHUB_TEMPLATE_OWNER`, `GITHUB_REPO_PREFIX`, `GITHUB_ACTIONS_WORKFLOW_FILE`, `GITHUB_TOKEN`, `GITHUB_CLEANUP_ENABLED` (future).

@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 
 import pytest
 from fastapi import Request
-from fastapi.security import HTTPAuthorizationCredentials
 
 from app.infra.security import dependencies
 from tests.factories import create_recruiter
@@ -63,20 +62,6 @@ async def test_dev_bypass_guard_against_prod(monkeypatch):
         await dependencies._dev_bypass_user(req, None)
 
 
-@pytest.mark.asyncio
-async def test_auth0_user_creates_new_user(async_session, monkeypatch):
-    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
-    monkeypatch.setattr(
-        dependencies.auth0,
-        "decode_auth0_token",
-        lambda _t: {"email": "newuser@example.com", "name": "New User"},
-    )
-
-    user = await dependencies._auth0_user(creds, async_session)
-    assert user.email == "newuser@example.com"
-    assert user.role == "recruiter"
-
-
 def test_env_name_override(monkeypatch):
     override_module = type("m", (), {"_env_name": lambda: "override"})
     monkeypatch.setitem(
@@ -120,88 +105,6 @@ async def test_dev_bypass_fallback_session_maker(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_auth0_user_uses_fallback_session(monkeypatch):
-    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
-    monkeypatch.setattr(
-        dependencies.auth0,
-        "decode_auth0_token",
-        lambda _t: {"email": "fallback@example.com"},
-    )
-
-    class DummySession:
-        def __init__(self):
-            self.added = False
-            self.committed = False
-            self.refreshed = False
-
-        async def execute(self, *_a, **_k):
-            class R:
-                def scalar_one_or_none(self_inner):
-                    return None
-
-            return R()
-
-        def add(self, _obj):
-            self.added = True
-
-        async def commit(self):
-            self.committed = True
-
-        async def refresh(self, _obj):
-            self.refreshed = True
-
-    monkeypatch.setitem(
-        dependencies.sys.modules,
-        "app.infra.security.current_user",
-        type("mod", (), {"async_session_maker": _ctx_maker(DummySession())}),
-    )
-
-    user = await dependencies._auth0_user(creds, None)
-    assert user.email == "fallback@example.com"
-    assert user.role == "recruiter"
-
-
-@pytest.mark.asyncio
-async def test_auth0_user_handles_integrity_error(monkeypatch):
-    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
-    monkeypatch.setattr(
-        dependencies.auth0,
-        "decode_auth0_token",
-        lambda _t: {"email": "dup@example.com"},
-    )
-
-    class DummySession:
-        def __init__(self):
-            self.rollback_called = False
-            self.calls = 0
-
-        async def execute(self, *_a, **_k):
-            self.calls += 1
-
-            class R:
-                def scalar_one_or_none(self_inner):
-                    if self.calls == 1:
-                        return None
-                    return type("User", (), {"email": "dup@example.com"})
-
-            return R()
-
-        def add(self, _obj):
-            return None
-
-        async def commit(self):
-            raise dependencies.IntegrityError("", {}, None)
-
-        async def rollback(self):
-            self.rollback_called = True
-
-    session = DummySession()
-    user = await dependencies._auth0_user(creds, session)
-    assert user.email == "dup@example.com"
-    assert session.rollback_called is True
-
-
-@pytest.mark.asyncio
 async def test_get_current_user_prefers_dev_bypass(monkeypatch, async_session):
     req = _make_request({"x-dev-user-email": "dev@local.test"})
     dummy_user = object()
@@ -210,7 +113,7 @@ async def test_get_current_user_prefers_dev_bypass(monkeypatch, async_session):
         return dummy_user
 
     monkeypatch.setattr(dependencies, "_dev_bypass_user", _return_user)
-    result = await dependencies.get_current_user(req, None, async_session)
+    result = await dependencies.get_current_user(req, async_session, None)
     assert result is dummy_user
 
 

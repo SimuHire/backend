@@ -1,20 +1,19 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
+from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.candidate_sessions.schemas import (
     CandidateSessionResolveResponse,
-    CandidateSessionVerifyRequest,
-    CandidateSessionVerifyResponse,
     CandidateSimulationSummary,
     CurrentTaskResponse,
     ProgressSummary,
 )
 from app.domains.tasks.schemas_public import TaskPublic
 from app.infra.db import get_session
+from app.infra.security.principal import Principal, require_permissions
 
 router = APIRouter()
 
@@ -22,39 +21,47 @@ router = APIRouter()
 @router.get("/session/{token}", response_model=CandidateSessionResolveResponse)
 async def resolve_candidate_session(
     token: Annotated[str, Path(..., min_length=20, max_length=255)],
+    principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> CandidateSessionResolveResponse:
-    """Reject invite-only access; require email verification step."""
-    await cs_service.fetch_by_token(db, token, now=datetime.now(UTC))
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Email verification required",
+    """Claim an invite token for the authenticated candidate."""
+    cs = await cs_service.claim_invite_with_principal(
+        db, token, principal, now=datetime.now(UTC)
+    )
+    await db.refresh(cs, attribute_names=["simulation"])
+    sim = cs.simulation
+    return CandidateSessionResolveResponse(
+        candidateSessionId=cs.id,
+        status=cs.status,
+        startedAt=cs.started_at,
+        completedAt=cs.completed_at,
+        candidateName=cs.candidate_name,
+        simulation=CandidateSimulationSummary(
+            id=sim.id,
+            title=sim.title,
+            role=sim.role,
+        ),
     )
 
 
 @router.post(
     "/session/{token}/verify",
-    response_model=CandidateSessionVerifyResponse,
+    response_model=CandidateSessionResolveResponse,
     status_code=status.HTTP_200_OK,
 )
 async def verify_candidate_session(
     token: Annotated[str, Path(..., min_length=20, max_length=255)],
-    payload: CandidateSessionVerifyRequest,
     db: Annotated[AsyncSession, Depends(get_session)],
-) -> CandidateSessionVerifyResponse:
-    """Verify invite email and issue a short-lived candidate token."""
+    principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
+) -> CandidateSessionResolveResponse:
+    """Idempotent claim endpoint for authenticated candidates."""
     now = datetime.now(UTC)
-    cs = await cs_service.verify_email_and_issue_token(
-        db, token, str(payload.email).lower(), now=now
-    )
-    # Ensure related simulation is loaded without triggering lazy IO later.
+    cs = await cs_service.claim_invite_with_principal(db, token, principal, now=now)
     await db.refresh(cs, attribute_names=["simulation"])
 
     sim = cs.simulation
-    return CandidateSessionVerifyResponse(
+    return CandidateSessionResolveResponse(
         candidateSessionId=cs.id,
-        candidateToken=cs.access_token,
-        tokenExpiresAt=cs.access_token_expires_at,
         status=cs.status,
         startedAt=cs.started_at,
         completedAt=cs.completed_at,
@@ -73,7 +80,7 @@ async def verify_candidate_session(
 )
 async def get_current_task(
     candidate_session_id: int,
-    x_candidate_token: Annotated[str, Header(..., alias="x-candidate-token")],
+    principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> CurrentTaskResponse:
     """Return the current task for a candidate session.
@@ -82,8 +89,8 @@ async def get_current_task(
     that does not yet have a submission from this candidate.
     """
     now = datetime.now(UTC)
-    cs = await cs_service.fetch_by_id_and_token(
-        db, candidate_session_id, x_candidate_token, now=now
+    cs = await cs_service.fetch_owned_session(
+        db, candidate_session_id, principal, now=now
     )
     (
         tasks,

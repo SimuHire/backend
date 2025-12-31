@@ -48,10 +48,9 @@ class CandidateSessionVerifyRequest(APIModel):
 
 
 class CandidateSessionVerifyResponse(CandidateSessionResolveResponse):
-    """Session details plus a short-lived candidate token."""
+    """Backward-compatible alias for candidate session claim responses."""
 
-    candidateToken: str
-    tokenExpiresAt: datetime
+    pass
 
 
 class ProgressSummary(APIModel):

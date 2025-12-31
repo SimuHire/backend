@@ -41,6 +41,24 @@ def test_auth0_helpers_default_to_domain():
     assert s.auth0_algorithms == ["RS256", "HS256"]
 
 
+def test_auth0_fail_fast_missing_audience():
+    with pytest.raises(ValueError) as excinfo:
+        Settings(
+            _env_file=None,
+            ENV="prod",
+            AUTH0_DOMAIN="example.auth0.com",
+            AUTH0_API_AUDIENCE="",
+        )
+    assert "AUTH0_API_AUDIENCE" in str(excinfo.value)
+
+
+def test_auth0_fail_fast_missing_issuer(monkeypatch):
+    monkeypatch.setenv("AUTH0_DOMAIN", "")
+    with pytest.raises(ValueError) as excinfo:
+        Settings(_env_file=None, ENV="prod", AUTH0_API_AUDIENCE="api://aud")
+    assert "AUTH0_ISSUER" in str(excinfo.value) or "AUTH0_DOMAIN" in str(excinfo.value)
+
+
 def test_github_settings_merge_flat_env():
     s = Settings(
         GITHUB_API_BASE="https://api.github.com",

@@ -101,16 +101,14 @@ async def create_candidate_session(
     expires_in_days: int = 14,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
+    candidate_email: str | None = None,
+    candidate_auth0_sub: str | None = None,
+    claimed_at: datetime | None = None,
     access_token: str | None = None,
     access_token_expires_in_minutes: int = 60,
 ) -> CandidateSession:
     token = token or secrets.token_urlsafe(16)
     expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
-    access_expires_at = None
-    if access_token:
-        access_expires_at = datetime.now(UTC) + timedelta(
-            minutes=access_token_expires_in_minutes
-        )
 
     cs = CandidateSession(
         simulation_id=simulation.id,
@@ -118,8 +116,9 @@ async def create_candidate_session(
         candidate_name=candidate_name,
         invite_email=invite_email,
         token=token,
-        access_token=access_token,
-        access_token_expires_at=access_expires_at,
+        candidate_email=candidate_email,
+        candidate_auth0_sub=candidate_auth0_sub,
+        claimed_at=claimed_at,
         status=status,
         expires_at=expires_at,
         started_at=started_at,

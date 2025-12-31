@@ -15,6 +15,7 @@ from app.domains import Base, User
 from app.domains.github_native.actions_runner import ActionsRunResult
 from app.infra.db import get_session
 from app.infra.security.current_user import get_current_user
+from app.infra.security.principal import Principal, get_principal
 from app.main import app
 
 
@@ -81,14 +82,59 @@ async def async_client(db_session: AsyncSession):
             )
         return user
 
+    async def override_get_principal(request: Request) -> Principal:
+        auth_header = (request.headers.get("Authorization") or "").strip()
+        kind = "candidate"
+        email = None
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1]
+            kind, email = token.split(":", 1) if ":" in token else ("candidate", token)
+        else:
+            # Legacy helper for existing tests: derive identity from candidate headers.
+            cs_id = request.headers.get("x-candidate-session-id")
+            if cs_id:
+                from app.domains import CandidateSession
+
+                cs_obj = await db_session.get(CandidateSession, int(cs_id))
+                if cs_obj:
+                    email = cs_obj.candidate_email or cs_obj.invite_email
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            )
+
+        perms: list[str] = []
+        if kind == "recruiter":
+            perms = ["recruiter:access"]
+        elif kind == "candidate":
+            perms = ["candidate:access"]
+        elif kind:
+            perms = [kind]
+
+        return Principal(
+            sub=f"{kind}-{email}",
+            email=email,
+            name=email.split("@")[0],
+            roles=[],
+            permissions=perms,
+            claims={
+                "sub": f"{kind}-{email}",
+                "email": email,
+                "https://simuhire.com/email": email,
+                "permissions": perms,
+            },
+        )
+
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_principal] = override_get_principal
 
     async with AsyncClient(app=app, base_url="http://testserver") as client:
         yield client
 
     app.dependency_overrides.pop(get_session, None)
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_principal, None)
 
 
 @pytest.fixture
@@ -177,11 +223,35 @@ def auth_header_factory():
 def candidate_header_factory():
     """Helper to build candidate headers from a session/token."""
 
-    def _build(candidate_session_id: int, token: str) -> dict[str, str]:
-        return {
-            "x-candidate-token": token,
-            "x-candidate-session-id": str(candidate_session_id),
+    def _build(
+        candidate_session_id: int | Base,
+        token: str | None = None,
+        *,
+        email: str | None = None,
+    ) -> dict[str, str]:
+        session_id = (
+            candidate_session_id.id
+            if hasattr(candidate_session_id, "id")
+            else candidate_session_id
+        )
+        resolved_email = email
+        if hasattr(candidate_session_id, "candidate_email") or hasattr(
+            candidate_session_id, "invite_email"
+        ):
+            resolved_email = resolved_email or getattr(
+                candidate_session_id, "candidate_email", None
+            )
+            resolved_email = resolved_email or getattr(
+                candidate_session_id, "invite_email", None
+            )
+        resolved_email = resolved_email or "jane@example.com"
+        headers = {
+            "x-candidate-session-id": str(session_id),
+            "Authorization": f"Bearer candidate:{resolved_email}",
         }
+        if token:
+            headers["x-candidate-token"] = token
+        return headers
 
     return _build
 

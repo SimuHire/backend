@@ -7,6 +7,23 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.routes import candidate_sessions
+from app.infra.security.principal import Principal
+
+
+def _principal(email: str) -> Principal:
+    return Principal(
+        sub=f"auth0|{email}",
+        email=email,
+        name=email.split("@")[0],
+        roles=[],
+        permissions=["candidate:access"],
+        claims={
+            "sub": f"auth0|{email}",
+            "email": email,
+            "https://simuhire.com/email": email,
+            "permissions": ["candidate:access"],
+        },
+    )
 
 
 class StubSession:
@@ -36,10 +53,17 @@ async def test_resolve_candidate_session_requires_verification(monkeypatch):
     async def _return_cs(*_a, **_k):
         return cs
 
-    monkeypatch.setattr(candidate_sessions.cs_service, "fetch_by_token", _return_cs)
+    async def _claim(*_a, **_k):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    monkeypatch.setattr(
+        candidate_sessions.cs_service, "claim_invite_with_principal", _claim
+    )
     with pytest.raises(HTTPException) as excinfo:
-        await candidate_sessions.resolve_candidate_session(token="t" * 24, db=stub_db)
-    assert excinfo.value.status_code == 401
+        await candidate_sessions.resolve_candidate_session(
+            token="t" * 24, db=stub_db, principal=_principal("test@example.com")
+        )
+    assert excinfo.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -70,14 +94,16 @@ async def test_get_current_task_marks_completed(monkeypatch):
         )
 
     monkeypatch.setattr(
-        candidate_sessions.cs_service, "fetch_by_id_and_token", _fetch_by_id
+        candidate_sessions.cs_service, "fetch_owned_session", _fetch_by_id
     )
     monkeypatch.setattr(
         candidate_sessions.cs_service, "progress_snapshot", _progress_snapshot
     )
 
     resp = await candidate_sessions.get_current_task(
-        candidate_session_id=cs.id, x_candidate_token="tok", db=stub_db
+        candidate_session_id=cs.id,
+        db=stub_db,
+        principal=_principal("user@example.com"),
     )
     assert resp.isComplete is True
     assert resp.currentDayIndex is None
@@ -101,20 +127,22 @@ async def test_verify_candidate_session_returns_token(monkeypatch):
         simulation=SimpleNamespace(id=10, title="Sim", role="Backend"),
     )
 
-    async def _verify(db, token, email, now):
+    async def _verify(db, token, principal, now):
         assert token == "t" * 24
-        assert email == "test@example.com"
+        assert principal.email == "test@example.com"
         assert isinstance(now, datetime)
         return cs
 
     monkeypatch.setattr(
-        candidate_sessions.cs_service, "verify_email_and_issue_token", _verify
+        candidate_sessions.cs_service, "claim_invite_with_principal", _verify
     )
 
     resp = await candidate_sessions.verify_candidate_session(
-        token="t" * 24, payload=SimpleNamespace(email="test@example.com"), db=stub_db
+        token="t" * 24,
+        db=stub_db,
+        principal=_principal("test@example.com"),
     )
 
-    assert resp.candidateToken == cs.access_token
-    assert resp.tokenExpiresAt == expires_at
+    assert resp.candidateSessionId == cs.id
+    assert resp.startedAt == cs.started_at
     assert resp.candidateName == cs.candidate_name
