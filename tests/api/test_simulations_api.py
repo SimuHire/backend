@@ -1,5 +1,10 @@
 import pytest
+from sqlalchemy import select
 
+from app.api.dependencies.notifications import get_email_service
+from app.domains import CandidateSession
+from app.infra.notifications.email_provider import MemoryEmailProvider
+from app.services.email import EmailService
 from tests.factories import create_recruiter, create_simulation
 
 
@@ -54,6 +59,41 @@ async def test_list_simulations_scoped_to_owner(
     assert owned_sim.id in ids
     # cross-company sim must be hidden
     assert all(item["title"] != "Other Sim" for item in res.json())
+
+
+@pytest.mark.asyncio
+async def test_invite_sends_email_and_tracks_status(
+    async_client, async_session, auth_header_factory, override_dependencies
+):
+    recruiter = await create_recruiter(async_session, email="notify@app.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+
+    provider = MemoryEmailProvider()
+    email_service = EmailService(provider, sender="noreply@test.com")
+
+    with override_dependencies({get_email_service: lambda: email_service}):
+        res = await async_client.post(
+            f"/api/simulations/{sim.id}/invite",
+            json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
+            headers=auth_header_factory(recruiter),
+        )
+
+    assert res.status_code == 201, res.text
+
+    cs = (await async_session.execute(select(CandidateSession))).scalar_one()
+    assert cs.invite_email_status == "sent"
+    assert cs.invite_email_sent_at is not None
+    assert len(provider.sent) == 1
+    assert provider.sent[0].to == cs.invite_email
+
+    list_res = await async_client.get(
+        f"/api/simulations/{sim.id}/candidates",
+        headers=auth_header_factory(recruiter),
+    )
+    assert list_res.status_code == 200
+    body = list_res.json()[0]
+    assert body["inviteEmailStatus"] == "sent"
+    assert body["inviteEmailSentAt"] is not None
 
 
 @pytest.mark.asyncio

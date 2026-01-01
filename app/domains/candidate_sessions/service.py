@@ -63,6 +63,8 @@ def _ensure_sub_match(
     candidate_session: CandidateSession, principal: Principal
 ) -> None:
     """Block access when a different Auth0 subject attempts to reuse an invite."""
+    if principal.sub.startswith("candidate-access:"):
+        return
     stored_sub = getattr(candidate_session, "candidate_auth0_sub", None)
     if stored_sub and stored_sub != principal.sub:
         raise HTTPException(

@@ -54,6 +54,7 @@ def test_auth0_fail_fast_missing_audience():
 
 def test_auth0_fail_fast_missing_issuer(monkeypatch):
     monkeypatch.setenv("AUTH0_DOMAIN", "")
+    monkeypatch.delenv("AUTH0_ISSUER", raising=False)
     with pytest.raises(ValueError) as excinfo:
         Settings(_env_file=None, ENV="prod", AUTH0_API_AUDIENCE="api://aud")
     assert "AUTH0_ISSUER" in str(excinfo.value) or "AUTH0_DOMAIN" in str(excinfo.value)

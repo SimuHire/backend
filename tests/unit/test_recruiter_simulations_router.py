@@ -21,20 +21,33 @@ async def test_create_candidate_invite_happy_path(monkeypatch):
         assert payload.candidateName == "Name"
         return cs
 
+    async def _send_invite_email(*_args, **_kwargs):
+        return SimpleNamespace(status="sent")
+
     monkeypatch.setattr(recruiter_sims, "ensure_recruiter_or_none", lambda _u: None)
     monkeypatch.setattr(
         recruiter_sims.sim_service, "require_owned_simulation", _require_owned
     )
     monkeypatch.setattr(recruiter_sims.sim_service, "create_invite", _create_invite)
     monkeypatch.setattr(
+        recruiter_sims.notification_service, "send_invite_email", _send_invite_email
+    )
+    monkeypatch.setattr(
         recruiter_sims.sim_service,
         "invite_url",
         lambda token: f"https://portal/{token}",
     )
+    email_service = SimpleNamespace(
+        send_email=lambda **_k: SimpleNamespace(status="sent")
+    )
 
     payload = SimpleNamespace(candidateName="Name", inviteEmail="a@b.com")
     resp = await recruiter_sims.create_candidate_invite(
-        simulation_id=5, payload=payload, db=None, user=user
+        simulation_id=5,
+        payload=payload,
+        db=None,
+        user=user,
+        email_service=email_service,
     )
     assert resp.inviteUrl.endswith("/tok")
     assert resp.candidateSessionId == cs.id

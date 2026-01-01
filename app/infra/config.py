@@ -128,6 +128,22 @@ class GithubSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
 
+class EmailSettings(BaseSettings):
+    """Email provider configuration."""
+
+    EMAIL_PROVIDER: str = "console"
+    EMAIL_FROM: str = "SimuHire <notifications@simuhire.com>"
+    RESEND_API_KEY: str = ""
+    SENDGRID_API_KEY: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+
+    model_config = SettingsConfigDict(extra="ignore")
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and `.env`."""
 
@@ -158,6 +174,7 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     cors: CorsSettings = Field(default_factory=CorsSettings)
     github: GithubSettings = Field(default_factory=GithubSettings)
+    email: EmailSettings = Field(default_factory=EmailSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
 
@@ -186,6 +203,17 @@ class Settings(BaseSettings):
             "GITHUB_ACTIONS_WORKFLOW_FILE",
             "GITHUB_REPO_PREFIX",
             "GITHUB_CLEANUP_ENABLED",
+        }
+        email_keys = {
+            "EMAIL_PROVIDER",
+            "EMAIL_FROM",
+            "RESEND_API_KEY",
+            "SENDGRID_API_KEY",
+            "SMTP_HOST",
+            "SMTP_PORT",
+            "SMTP_USERNAME",
+            "SMTP_PASSWORD",
+            "SMTP_TLS",
         }
 
         db_data = dict(data.get("database", {}) or {})
@@ -224,6 +252,15 @@ class Settings(BaseSettings):
         if github_data:
             data["github"] = github_data
 
+        email_data = dict(data.get("email", {}) or {})
+        for key in email_keys:
+            if key in data:
+                email_data[key] = data.pop(key)
+            elif (env_val := os.getenv(key)) is not None:
+                email_data[key] = env_val
+        if email_data:
+            data["email"] = email_data
+
         return data
 
     @model_validator(mode="after")
@@ -231,10 +268,9 @@ class Settings(BaseSettings):
         """Fail fast when critical Auth0 settings are missing in non-test envs."""
         env = str(self.ENV or "").lower()
         if env != "test":
-            issuer = (self.auth.AUTH0_ISSUER or "").strip() or (
-                self.auth.AUTH0_DOMAIN and f"https://{self.auth.AUTH0_DOMAIN}/"
-            )
-            if not issuer:
+            issuer_val = (self.auth.AUTH0_ISSUER or "").strip()
+            domain_val = (self.auth.AUTH0_DOMAIN or "").strip()
+            if not issuer_val and not domain_val:
                 raise ValueError(
                     "AUTH0_ISSUER (or AUTH0_DOMAIN) must be set for Auth0 validation"
                 )

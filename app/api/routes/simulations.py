@@ -1,14 +1,17 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies.notifications import get_email_service
+from app.domains import CandidateSession
 from app.domains.candidate_sessions.schemas import (
     CandidateInviteRequest,
     CandidateInviteResponse,
     CandidateSessionListItem,
 )
+from app.domains.notifications import service as notification_service
 from app.domains.simulations import service as sim_service
 from app.domains.simulations.schemas import (
     SimulationCreate,
@@ -16,9 +19,11 @@ from app.domains.simulations.schemas import (
     SimulationListItem,
     TaskOut,
 )
+from app.domains.simulations.simulation import Simulation
 from app.infra.db import get_session
 from app.infra.security.current_user import get_current_user
 from app.infra.security.roles import ensure_recruiter_or_none
+from app.services.email import EmailService
 
 router = APIRouter()
 
@@ -86,13 +91,22 @@ async def create_candidate_invite(
     payload: CandidateInviteRequest,
     db: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[Any, Depends(get_current_user)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
 ):
     """Create a candidate_session invite token for a simulation (recruiter-only)."""
     ensure_recruiter_or_none(user)
 
-    await sim_service.require_owned_simulation(db, simulation_id, user.id)
+    sim = await sim_service.require_owned_simulation(db, simulation_id, user.id)
     cs = await sim_service.create_invite(
         db, simulation_id, payload, now=datetime.now(UTC)
+    )
+    await notification_service.send_invite_email(
+        db,
+        candidate_session=cs,
+        simulation=sim,
+        invite_url=sim_service.invite_url(cs.token),
+        email_service=email_service,
+        now=datetime.now(UTC),
     )
     return CandidateInviteResponse(
         candidateSessionId=cs.id,
@@ -126,6 +140,47 @@ async def list_simulation_candidates(
             startedAt=cs.started_at,
             completedAt=cs.completed_at,
             hasReport=(profile_id is not None),
+            inviteEmailStatus=getattr(cs, "invite_email_status", None),
+            inviteEmailSentAt=getattr(cs, "invite_email_sent_at", None),
+            inviteEmailError=getattr(cs, "invite_email_error", None),
         )
         for cs, profile_id in rows
     ]
+
+
+@router.post(
+    "/{simulation_id}/candidates/{candidate_session_id}/invite/resend",
+    status_code=status.HTTP_200_OK,
+)
+async def resend_candidate_invite(
+    simulation_id: int,
+    candidate_session_id: int,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[Any, Depends(get_current_user)],
+    email_service: Annotated[EmailService, Depends(get_email_service)],
+):
+    """Resend an invite email for a candidate session (recruiter-only)."""
+    ensure_recruiter_or_none(user)
+    sim: Simulation = await sim_service.require_owned_simulation(
+        db, simulation_id, user.id
+    )
+    cs = await db.get(CandidateSession, candidate_session_id)
+    if cs is None or cs.simulation_id != sim.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate session not found",
+        )
+
+    await notification_service.send_invite_email(
+        db,
+        candidate_session=cs,
+        simulation=sim,
+        invite_url=sim_service.invite_url(cs.token),
+        email_service=email_service,
+        now=datetime.now(UTC),
+    )
+    return {
+        "inviteEmailStatus": getattr(cs, "invite_email_status", None),
+        "inviteEmailSentAt": getattr(cs, "invite_email_sent_at", None),
+        "inviteEmailError": getattr(cs, "invite_email_error", None),
+    }
