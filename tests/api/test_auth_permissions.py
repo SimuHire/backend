@@ -138,7 +138,7 @@ async def test_candidate_matching_email_can_claim(async_client, async_session):
     cs = await create_candidate_session(async_session, simulation=sim)
 
     res = await async_client.post(
-        f"/api/candidate/session/{cs.token}/verify",
+        f"/api/candidate/session/{cs.token}/claim",
         headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 200
@@ -151,7 +151,7 @@ async def test_candidate_mismatched_email_gets_403(async_client, async_session):
     cs = await create_candidate_session(async_session, simulation=sim)
 
     res = await async_client.post(
-        f"/api/candidate/session/{cs.token}/verify",
+        f"/api/candidate/session/{cs.token}/claim",
         headers={"Authorization": "Bearer candidate:notme@example.com"},
     )
     assert res.status_code == 403

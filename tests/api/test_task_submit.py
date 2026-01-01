@@ -60,7 +60,7 @@ async def resolve_session(
     async_client, token: str, email: str = "jane@example.com"
 ) -> dict:
     resp = await async_client.post(
-        f"/api/candidate/session/{token}/verify",
+        f"/api/candidate/session/{token}/claim",
         headers={"Authorization": f"Bearer candidate:{email}"},
     )
     assert resp.status_code == 200, resp.text

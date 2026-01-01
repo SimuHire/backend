@@ -54,9 +54,9 @@ FastAPI + Postgres backend for SimuHire. Recruiters create 5-day simulations, in
 
 ## Typical Flow
 
-1) Recruiter authenticates → `POST /api/simulations` → `POST /api/simulations/{id}/invite` to generate candidate link.
-2) Candidate opens invite while logged in via Auth0 → claims invite (email match required) → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
-3) Recruiter views submissions list/detail with repo/workflow/commit/diff/test results.
+1. Recruiter authenticates → `POST /api/simulations` → `POST /api/simulations/{id}/invite` to generate candidate link.
+2. Candidate opens invite while logged in via Auth0 → claims invite (email match required) → sees current task → for code/debug tasks calls `/codespace/init` → works in Codespace → `/run` to test → `/submit` to turn in.
+3. Recruiter views submissions list/detail with repo/workflow/commit/diff/test results.
 
 ## Local Development
 

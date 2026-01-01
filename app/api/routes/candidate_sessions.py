@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.candidate_sessions.schemas import (
+    CandidateInviteListItem,
     CandidateSessionResolveResponse,
     CandidateSimulationSummary,
     CurrentTaskResponse,
@@ -45,16 +46,21 @@ async def resolve_candidate_session(
 
 
 @router.post(
+    "/session/{token}/claim",
+    response_model=CandidateSessionResolveResponse,
+    status_code=status.HTTP_200_OK,
+)
+@router.post(
     "/session/{token}/verify",
     response_model=CandidateSessionResolveResponse,
     status_code=status.HTTP_200_OK,
 )
-async def verify_candidate_session(
+async def claim_candidate_session(
     token: Annotated[str, Path(..., min_length=20, max_length=255)],
     db: Annotated[AsyncSession, Depends(get_session)],
     principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
 ) -> CandidateSessionResolveResponse:
-    """Idempotent claim endpoint for authenticated candidates."""
+    """Idempotent claim endpoint for authenticated candidates (no email body required)."""
     now = datetime.now(UTC)
     cs = await cs_service.claim_invite_with_principal(db, token, principal, now=now)
     await db.refresh(cs, attribute_names=["simulation"])
@@ -127,3 +133,12 @@ async def get_current_task(
         progress=ProgressSummary(completed=completed, total=total),
         isComplete=is_complete,
     )
+
+
+@router.get("/invites", response_model=list[CandidateInviteListItem])
+async def list_candidate_invites(
+    principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> list[CandidateInviteListItem]:
+    """List all invites for the authenticated candidate email."""
+    return await cs_service.invite_list_for_principal(db, principal)

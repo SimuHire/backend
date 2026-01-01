@@ -113,7 +113,8 @@ async def test_get_current_task_marks_completed(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_verify_candidate_session_returns_token(monkeypatch):
+@pytest.mark.parametrize("path", ["claim", "verify"])
+async def test_claim_and_verify_routes_share_logic(monkeypatch, path: str):
     stub_db = StubSession()
     expires_at = datetime.now(UTC)
     cs = SimpleNamespace(
@@ -137,7 +138,8 @@ async def test_verify_candidate_session_returns_token(monkeypatch):
         candidate_sessions.cs_service, "claim_invite_with_principal", _verify
     )
 
-    resp = await candidate_sessions.verify_candidate_session(
+    handler = candidate_sessions.claim_candidate_session
+    resp = await handler(
         token="t" * 24,
         db=stub_db,
         principal=_principal("test@example.com"),

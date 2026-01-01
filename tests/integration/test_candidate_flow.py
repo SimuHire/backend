@@ -39,7 +39,7 @@ async def test_full_flow_invite_through_first_submission(
     invite = invite_res.json()
 
     verify_res = await async_client.post(
-        f"/api/candidate/session/{invite['token']}/verify",
+        f"/api/candidate/session/{invite['token']}/claim",
         headers={"Authorization": "Bearer candidate:flow@example.com"},
     )
     assert verify_res.status_code == 200, verify_res.text

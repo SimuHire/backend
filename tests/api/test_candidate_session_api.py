@@ -21,7 +21,7 @@ async def test_resolve_session_transitions_to_in_progress(async_client, async_se
     assert cs.started_at is None
 
     res = await async_client.post(
-        f"/api/candidate/session/{cs.token}/verify",
+        f"/api/candidate/session/{cs.token}/claim",
         headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 200, res.text
@@ -72,6 +72,42 @@ async def test_current_task_marks_complete_when_all_tasks_done(
     await async_session.refresh(cs)
     assert cs.status == "completed"
     assert cs.completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_invites_list_shows_candidates_for_email(async_client, async_session):
+    recruiter = await create_recruiter(async_session, email="list@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs_match = await create_candidate_session(async_session, simulation=sim)
+    await create_candidate_session(
+        async_session,
+        simulation=sim,
+        invite_email="other@example.com",
+        candidate_name="Other",
+    )
+
+    res = await async_client.get(
+        "/api/candidate/invites",
+        headers={"Authorization": f"Bearer candidate:{cs_match.invite_email}"},
+    )
+    assert res.status_code == 200, res.text
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["candidateSessionId"] == cs_match.id
+
+
+@pytest.mark.asyncio
+async def test_claim_endpoint_forbidden_on_mismatch(async_client, async_session):
+    recruiter = await create_recruiter(async_session, email="claimfail@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+
+    res = await async_client.post(
+        f"/api/candidate/session/{cs.token}/claim",
+        headers={"Authorization": "Bearer candidate:notme@example.com"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Sign in with invited email"
 
 
 @pytest.mark.asyncio

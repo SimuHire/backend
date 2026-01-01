@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from sqlalchemy import distinct, select
+from datetime import datetime
+
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domains import CandidateSession, Submission, Task
+from app.domains.simulations.simulation import Simulation
 
 
 async def get_by_token(
@@ -44,3 +47,27 @@ async def completed_task_ids(db: AsyncSession, candidate_session_id: int) -> set
     )
     completed_res = await db.execute(completed_stmt)
     return set(completed_res.scalars().all())
+
+
+async def list_for_email(db: AsyncSession, email: str) -> list[CandidateSession]:
+    """Return candidate sessions for a given invite email (case-insensitive)."""
+    stmt = (
+        select(CandidateSession)
+        .where(func.lower(CandidateSession.invite_email) == func.lower(email))
+        .options(
+            selectinload(CandidateSession.simulation).selectinload(Simulation.company)
+        )
+    )
+    res = await db.execute(stmt)
+    return list(res.scalars().unique().all())
+
+
+async def last_submission_at(
+    db: AsyncSession, candidate_session_id: int
+) -> datetime | None:
+    """Return the most recent submission timestamp for a candidate session."""
+    stmt = select(func.max(Submission.submitted_at)).where(
+        Submission.candidate_session_id == candidate_session_id
+    )
+    res = await db.execute(stmt)
+    return res.scalar_one_or_none()

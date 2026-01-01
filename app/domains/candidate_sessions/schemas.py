@@ -60,6 +60,23 @@ class ProgressSummary(APIModel):
     total: int
 
 
+class CandidateInviteListItem(APIModel):
+    """Dashboard-friendly invite summary for candidates."""
+
+    candidateSessionId: int
+    simulationId: int
+    simulationTitle: str
+    role: str
+    companyName: str | None
+    status: CandidateSessionStatus
+    progress: ProgressSummary
+    lastActivityAt: datetime | None
+    inviteCreatedAt: datetime | None
+    expiresAt: datetime | None
+    inviteToken: str | None = None
+    isExpired: bool
+
+
 class CurrentTaskResponse(APIModel):
     """Schema for the current task assigned to the candidate."""
 

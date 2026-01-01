@@ -11,6 +11,10 @@ from app.domains.candidate_sessions.progress import (
     compute_current_task,
     summarize_progress,
 )
+from app.domains.candidate_sessions.schemas import (
+    CandidateInviteListItem,
+    ProgressSummary,
+)
 from app.infra.security.principal import Principal
 
 
@@ -51,7 +55,7 @@ def _ensure_email_match(candidate_session: CandidateSession, email: str) -> None
     if expected_email != normalized_email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized for this invite",
+            detail="Sign in with invited email",
         )
 
 
@@ -99,6 +103,56 @@ async def claim_invite_with_principal(
         await db.commit()
         await db.refresh(cs)
     return cs
+
+
+async def invite_list_for_principal(
+    db: AsyncSession, principal: Principal
+) -> list[CandidateInviteListItem]:
+    """Return candidate invite summaries for the authenticated candidate."""
+    email = _normalize_email(principal.email)
+    sessions = await cs_repo.list_for_email(db, email)
+    items: list[CandidateInviteListItem] = []
+    now = datetime.now(UTC)
+    for cs in sessions:
+        expires_at = cs.expires_at
+        is_expired = False
+        if expires_at is not None:
+            exp = (
+                expires_at.replace(tzinfo=UTC)
+                if expires_at.tzinfo is None
+                else expires_at
+            )
+            is_expired = exp < now
+        progress_tasks = await progress_snapshot(db, cs)
+        (
+            tasks,
+            completed_ids,
+            _current,
+            completed,
+            total,
+            _is_complete,
+        ) = progress_tasks
+        last_submitted_at = await cs_repo.last_submission_at(db, cs.id)
+        last_activity = last_submitted_at or cs.completed_at or cs.started_at
+        sim = cs.simulation
+        company_name = getattr(sim.company, "name", None) if sim else None
+        items.append(
+            CandidateInviteListItem(
+                candidateSessionId=cs.id,
+                simulationId=sim.id if sim else cs.simulation_id,
+                simulationTitle=sim.title if sim else "",
+                role=sim.role if sim else "",
+                companyName=company_name,
+                status=cs.status,
+                progress=ProgressSummary(completed=completed, total=total),
+                lastActivityAt=last_activity,
+                inviteCreatedAt=getattr(cs, "created_at", None),
+                expiresAt=cs.expires_at,
+                inviteToken=cs.token,
+                isExpired=is_expired,
+            )
+        )
+    return items
 
 
 async def fetch_owned_session(

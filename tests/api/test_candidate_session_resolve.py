@@ -312,7 +312,7 @@ async def test_verify_wrong_email_returns_403(async_client, async_session):
         headers={"Authorization": "Bearer candidate:wrong@example.com"},
     )
     assert res.status_code == 403
-    assert res.json()["detail"] == "Not authorized for this invite"
+    assert res.json()["detail"] == "Sign in with invited email"
 
     cs = (
         await async_session.execute(
@@ -361,3 +361,18 @@ async def test_resolve_invalid_token_returns_404(async_client):
     )
     assert res.status_code == 404
     assert res.json()["detail"] == "Invalid invite token"
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_wrong_email_forbidden(async_client, async_session):
+    recruiter_email = "wrongemail@test.com"
+    await _seed_recruiter(async_session, recruiter_email)
+    sim_id = await _create_simulation(async_client, recruiter_email)
+    invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+
+    res = await async_client.get(
+        f"/api/candidate/session/{invite['token']}",
+        headers={"Authorization": "Bearer candidate:notme@example.com"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Sign in with invited email"
