@@ -54,6 +54,44 @@ class CandidateSession(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    invite_email_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    invite_email_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    invite_email_last_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    invite_email_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    invite_email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    candidate_access_token_hash: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, index=True
+    )
+    candidate_access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    candidate_access_token_issued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    verification_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    verification_code_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verification_code_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verification_email_status: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
+    verification_email_error: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+    verification_email_last_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     simulation = relationship("Simulation", back_populates="candidate_sessions")
     candidate_user = relationship("User", back_populates="candidate_sessions")
     submissions = relationship(

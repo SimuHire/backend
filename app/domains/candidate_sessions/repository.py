@@ -29,6 +29,18 @@ async def get_by_id(db: AsyncSession, session_id: int) -> CandidateSession | Non
     return res.scalar_one_or_none()
 
 
+async def get_by_access_token_hash(
+    db: AsyncSession, token_hash: str
+) -> CandidateSession | None:
+    """Lookup a candidate session by access token hash."""
+    res = await db.execute(
+        select(CandidateSession).where(
+            CandidateSession.candidate_access_token_hash == token_hash
+        )
+    )
+    return res.scalar_one_or_none()
+
+
 async def tasks_for_simulation(db: AsyncSession, simulation_id: int) -> list[Task]:
     """Return tasks ordered by day_index for a simulation."""
     tasks_stmt = (

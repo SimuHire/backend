@@ -106,6 +106,8 @@ async def create_candidate_session(
     claimed_at: datetime | None = None,
     access_token: str | None = None,
     access_token_expires_in_minutes: int = 60,
+    verification_code: str | None = None,
+    verification_code_expires_at: datetime | None = None,
 ) -> CandidateSession:
     token = token or secrets.token_urlsafe(16)
     expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
@@ -123,6 +125,8 @@ async def create_candidate_session(
         expires_at=expires_at,
         started_at=started_at,
         completed_at=completed_at,
+        verification_code=verification_code,
+        verification_code_expires_at=verification_code_expires_at,
     )
     session.add(cs)
     await session.flush()

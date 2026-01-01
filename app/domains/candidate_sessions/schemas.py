@@ -53,6 +53,28 @@ class CandidateSessionVerifyResponse(CandidateSessionResolveResponse):
     pass
 
 
+class CandidateVerificationSendResponse(APIModel):
+    """Response for sending a verification code to the candidate."""
+
+    status: str
+    maskedEmail: str
+    expiresAt: datetime | None
+
+
+class CandidateVerificationConfirmRequest(APIModel):
+    """Request body for confirming a verification code."""
+
+    code: str
+
+
+class CandidateVerificationConfirmResponse(APIModel):
+    """Response after successful verification code confirmation."""
+
+    verified: bool
+    candidateAccessToken: str
+    expiresAt: datetime
+
+
 class ProgressSummary(APIModel):
     """Summary of progress for the candidate session."""
 
@@ -99,3 +121,6 @@ class CandidateSessionListItem(APIModel):
     startedAt: datetime | None
     completedAt: datetime | None
     hasReport: bool
+    inviteEmailStatus: str | None = None
+    inviteEmailSentAt: datetime | None = None
+    inviteEmailError: str | None = None
