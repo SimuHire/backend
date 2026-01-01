@@ -21,16 +21,14 @@ async def test_resolve_session_transitions_to_in_progress(async_client, async_se
     assert cs.started_at is None
 
     res = await async_client.post(
-        f"/api/candidate/session/{cs.token}/verify",
-        json={"email": cs.invite_email},
+        f"/api/candidate/session/{cs.token}/claim",
+        headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 200, res.text
 
     body = res.json()
     assert body["status"] == "in_progress"
     assert body["candidateSessionId"] == cs.id
-    assert body["candidateToken"]
-    assert body["tokenExpiresAt"]
 
     await async_session.refresh(cs)
     assert cs.status == "in_progress"
@@ -47,7 +45,6 @@ async def test_current_task_marks_complete_when_all_tasks_done(
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-complete",
         started_at=datetime.now(UTC) - timedelta(hours=1),
     )
 
@@ -62,7 +59,7 @@ async def test_current_task_marks_complete_when_all_tasks_done(
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.access_token},
+        headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 200, res.text
 
@@ -78,6 +75,42 @@ async def test_current_task_marks_complete_when_all_tasks_done(
 
 
 @pytest.mark.asyncio
+async def test_invites_list_shows_candidates_for_email(async_client, async_session):
+    recruiter = await create_recruiter(async_session, email="list@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs_match = await create_candidate_session(async_session, simulation=sim)
+    await create_candidate_session(
+        async_session,
+        simulation=sim,
+        invite_email="other@example.com",
+        candidate_name="Other",
+    )
+
+    res = await async_client.get(
+        "/api/candidate/invites",
+        headers={"Authorization": f"Bearer candidate:{cs_match.invite_email}"},
+    )
+    assert res.status_code == 200, res.text
+    items = res.json()
+    assert len(items) == 1
+    assert items[0]["candidateSessionId"] == cs_match.id
+
+
+@pytest.mark.asyncio
+async def test_claim_endpoint_forbidden_on_mismatch(async_client, async_session):
+    recruiter = await create_recruiter(async_session, email="claimfail@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+
+    res = await async_client.post(
+        f"/api/candidate/session/{cs.token}/claim",
+        headers={"Authorization": "Bearer candidate:notme@example.com"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Sign in with invited email"
+
+
+@pytest.mark.asyncio
 async def test_get_current_task_respects_expiry(async_client, async_session):
     recruiter = await create_recruiter(async_session, email="expired@test.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
@@ -86,20 +119,22 @@ async def test_get_current_task_respects_expiry(async_client, async_session):
         simulation=sim,
         expires_in_days=-1,
         status="in_progress",
-        access_token="tok-expired",
         started_at=datetime.now(UTC) - timedelta(days=2),
     )
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.access_token},
+        headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 410
 
 
 @pytest.mark.asyncio
 async def test_resolve_invalid_token(async_client):
-    res = await async_client.get("/api/candidate/session/" + "x" * 24)
+    res = await async_client.get(
+        "/api/candidate/session/" + "x" * 24,
+        headers={"Authorization": "Bearer candidate:jane@example.com"},
+    )
     assert res.status_code == 404
 
 
@@ -114,7 +149,10 @@ async def test_resolve_expired_token_returns_410(async_client, async_session):
         status="not_started",
     )
 
-    res = await async_client.get(f"/api/candidate/session/{cs.token}")
+    res = await async_client.get(
+        f"/api/candidate/session/{cs.token}",
+        headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
+    )
     assert res.status_code == 410
 
 
@@ -126,14 +164,13 @@ async def test_current_task_token_mismatch(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-mismatch",
     )
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": "wrong"},
+        headers={"Authorization": "Bearer candidate:other@example.com"},
     )
-    assert res.status_code == 404
+    assert res.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -144,7 +181,6 @@ async def test_current_task_no_tasks_returns_500(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-notasks",
     )
 
     # Remove all tasks to trigger guard
@@ -155,6 +191,6 @@ async def test_current_task_no_tasks_returns_500(async_client, async_session):
 
     res = await async_client.get(
         f"/api/candidate/session/{cs.id}/current_task",
-        headers={"x-candidate-token": cs.access_token},
+        headers={"Authorization": f"Bearer candidate:{cs.invite_email}"},
     )
     assert res.status_code == 500

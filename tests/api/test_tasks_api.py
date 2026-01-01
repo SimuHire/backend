@@ -29,7 +29,7 @@ async def test_submit_rejects_expired_session(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{task_id}/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "should fail"},
@@ -62,7 +62,7 @@ async def test_submit_after_completion_returns_409(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{task_id}/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "too late"},
@@ -94,7 +94,7 @@ async def test_submit_returns_500_when_simulation_missing_tasks(
     res = await async_client.post(
         f"/api/tasks/{tasks[0].id}/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "should error"},
@@ -110,13 +110,12 @@ async def test_submit_task_not_found(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-missing",
     )
 
     res = await async_client.post(
         "/api/tasks/999999/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "no task"},
@@ -133,14 +132,13 @@ async def test_submit_task_from_other_simulation(async_client, async_session):
         async_session,
         simulation=sim_b,
         status="in_progress",
-        access_token="tok-cross",
     )
 
     # Use task from sim_a with session from sim_b -> 404
     res = await async_client.post(
         f"/api/tasks/{tasks_a[0].id}/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "wrong sim"},
@@ -156,7 +154,6 @@ async def test_submit_unknown_task_type_errors(async_client, async_session):
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-unknown",
     )
 
     # Manually insert a task with unsupported type
@@ -181,7 +178,7 @@ async def test_submit_unknown_task_type_errors(async_client, async_session):
     res = await async_client.post(
         f"/api/tasks/{bad_task.id}/submit",
         headers={
-            "x-candidate-token": cs.access_token,
+            "Authorization": f"Bearer candidate:{cs.invite_email}",
             "x-candidate-session-id": str(cs.id),
         },
         json={"contentText": "unknown"},

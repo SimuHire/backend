@@ -36,7 +36,10 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     """Instantiate and configure the FastAPI application."""
-    if os.getenv("DEV_AUTH_BYPASS") == "1" and _env_name() != "local":
+    dev_bypass_flag = getattr(settings, "DEV_AUTH_BYPASS", None) or os.getenv(
+        "DEV_AUTH_BYPASS"
+    )
+    if dev_bypass_flag == "1" and _env_name() != "local":
         raise RuntimeError(
             "Refusing to start: DEV_AUTH_BYPASS enabled outside ENV=local"
         )
@@ -63,15 +66,12 @@ def _configure_proxy_headers(app: FastAPI) -> None:
 
 def _cors_config() -> tuple[list[str], str | None]:
     """Build CORS origins and regex from env/settings with sensible defaults."""
-    allow_origins = _parse_csv(os.getenv("CORS_ALLOW_ORIGINS"))
-    allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX")
-
-    allow_origins = allow_origins or list(
-        getattr(settings, "CORS_ALLOW_ORIGINS", []) or []
-    )
-    allow_origin_regex = allow_origin_regex or getattr(
-        settings, "CORS_ALLOW_ORIGIN_REGEX", None
-    )
+    origins_from_settings = getattr(settings, "cors", None)
+    allow_origins = []
+    allow_origin_regex = None
+    if origins_from_settings:
+        allow_origins = list(origins_from_settings.CORS_ALLOW_ORIGINS or [])
+        allow_origin_regex = origins_from_settings.CORS_ALLOW_ORIGIN_REGEX
 
     if not allow_origins and not allow_origin_regex:
         allow_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]

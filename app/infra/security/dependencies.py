@@ -5,7 +5,7 @@ import sys
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,10 +14,11 @@ from app.domains import User
 from app.infra.config import settings  # noqa: F401
 from app.infra.db import async_session_maker, get_session
 from app.infra.env import env_name as _env_name_base
-from app.infra.security import auth0
-from app.infra.security.errors import AuthError
-
-bearer_scheme = HTTPBearer(auto_error=False)
+from app.infra.security.principal import (
+    Principal,
+    bearer_scheme,
+    get_principal,
+)
 
 
 def _current_user_module():
@@ -76,43 +77,20 @@ async def _dev_bypass_user(request: Request, db: AsyncSession | None) -> User | 
     return user
 
 
-async def _auth0_user(
-    credentials: HTTPAuthorizationCredentials | None, db: AsyncSession | None
-) -> User:
-    """Decode Auth0 token and return (or create) the user."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise AuthError("Not authenticated")
-
-    token = credentials.credentials
-
-    claims = auth0.decode_auth0_token(token)
-
-    email_value = claims.get("email") or claims.get("https://simuhire.com/email")
-    if not isinstance(email_value, str) or not email_value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email claim missing",
-        )
-    email = email_value
-
-    name_value = claims.get("name") or claims.get("https://simuhire.com/name")
-    if isinstance(name_value, str) and name_value.strip():
-        name = name_value.strip()
-    else:
-        name = email.split("@")[0]
-
+async def _user_from_principal(principal: Principal, db: AsyncSession | None) -> User:
+    """Find or create a recruiter user from the authenticated principal."""
     # Prefer injected db; fall back to session maker for backward-compat.
     if db is None:
         current_user_mod = _current_user_module()
         maker = getattr(current_user_mod, "async_session_maker", async_session_maker)
         async with maker() as session:
-            return await _auth0_user(credentials, session)
+            return await _user_from_principal(principal, session)
 
-    user = await _lookup_user(db, email)
+    user = await _lookup_user(db, principal.email)
     if user is None:
         user = User(
-            name=name,
-            email=email,
+            name=principal.name or principal.email.split("@")[0],
+            email=principal.email,
             role="recruiter",
             password_hash="",
         )
@@ -122,7 +100,7 @@ async def _auth0_user(
             await db.commit()
         except IntegrityError:
             await db.rollback()
-            user = await _lookup_user(db, email)
+            user = await _lookup_user(db, principal.email)
         else:
             await db.refresh(user)
 
@@ -131,12 +109,19 @@ async def _auth0_user(
 
 async def get_current_user(
     request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     db: Annotated[AsyncSession, Depends(get_session)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> User:
     """Return the current user via dev bypass (local/test) or Auth0 JWT."""
     dev_user = await _dev_bypass_user(request, db)
     if dev_user:
         return dev_user
 
-    return await _auth0_user(credentials, db)
+    principal = await get_principal(credentials)
+    if "recruiter:access" not in principal.permissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Recruiter access required",
+        )
+
+    return await _user_from_principal(principal, db)

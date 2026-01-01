@@ -43,4 +43,4 @@ async def test_auth_me_missing_email_claim(async_session, monkeypatch):
     finally:
         app.dependency_overrides.pop(get_session, None)
 
-    assert res.status_code == 400
+    assert res.status_code == 401

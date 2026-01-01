@@ -41,31 +41,49 @@ async def create_simulation(async_client, recruiter_email: str) -> dict:
     return resp.json()
 
 
-async def invite_candidate(async_client, sim_id: int, recruiter_email: str) -> dict:
+async def invite_candidate(
+    async_client,
+    sim_id: int,
+    recruiter_email: str,
+    invite_email: str = "jane@example.com",
+) -> dict:
     resp = await async_client.post(
         f"/api/simulations/{sim_id}/invite",
         headers={"x-dev-user-email": recruiter_email},
-        json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
+        json={"candidateName": "Jane Doe", "inviteEmail": invite_email},
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
-async def resolve_session(async_client, token: str) -> dict:
+async def resolve_session(
+    async_client, token: str, email: str = "jane@example.com"
+) -> dict:
     resp = await async_client.post(
-        f"/api/candidate/session/{token}/verify", json={"email": "jane@example.com"}
+        f"/api/candidate/session/{token}/claim",
+        headers={"Authorization": f"Bearer candidate:{email}"},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()
 
 
-async def get_current_task(async_client, cs_id: int, token: str) -> dict:
+async def get_current_task(async_client, cs_id: int, email: str) -> dict:
     resp = await async_client.get(
         f"/api/candidate/session/{cs_id}/current_task",
-        headers={"x-candidate-token": token},
+        headers={
+            "Authorization": f"Bearer candidate:{email}",
+            "x-candidate-session-id": str(cs_id),
+        },
     )
     assert resp.status_code == 200, resp.text
     return resp.json()
+
+
+def candidate_headers(cs_id: int, email: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer candidate:{email}",
+        "x-candidate-session-id": str(cs_id),
+    }
 
 
 def task_id_by_day(sim_json: dict, day_index: int) -> int:
@@ -92,17 +110,17 @@ async def test_submit_day1_text_creates_submission_and_advances(
 
     invite = await invite_candidate(async_client, sim_id, recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
-    current = await get_current_task(async_client, cs_id, token)
+    current = await get_current_task(async_client, cs_id, candidate_email)
     assert current["currentDayIndex"] == 1
     day1_task_id = current["currentTask"]["id"]
 
     submit = await async_client.post(
         f"/api/tasks/{day1_task_id}/submit",
         headers={
-            "x-candidate-token": token,
+            "Authorization": f"Bearer candidate:{candidate_email}",
             "x-candidate-session-id": str(cs_id),
         },
         json={"contentText": "Day 1 design answer"},
@@ -113,7 +131,7 @@ async def test_submit_day1_text_creates_submission_and_advances(
     assert body["taskId"] == day1_task_id
     assert body["progress"]["completed"] == 1
 
-    current2 = await get_current_task(async_client, cs_id, token)
+    current2 = await get_current_task(async_client, cs_id, candidate_email)
     assert current2["currentDayIndex"] == 2
 
 
@@ -134,36 +152,36 @@ async def test_submit_day2_code_records_actions_run(
 
     invite = await invite_candidate(async_client, sim_id, recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
     # Submit Day 1 (text)
-    day1_task_id = (await get_current_task(async_client, cs_id, token))["currentTask"][
-        "id"
-    ]
+    day1_task_id = (await get_current_task(async_client, cs_id, candidate_email))[
+        "currentTask"
+    ]["id"]
     r1 = await async_client.post(
         f"/api/tasks/{day1_task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"contentText": "done"},
     )
     assert r1.status_code == 201, r1.text
 
     # Submit Day 2 (code)
-    current2 = await get_current_task(async_client, cs_id, token)
+    current2 = await get_current_task(async_client, cs_id, candidate_email)
     assert current2["currentDayIndex"] == 2
     day2_task_id = current2["currentTask"]["id"]
 
     # Init workspace then submit (no code payload)
     init_resp = await async_client.post(
         f"/api/tasks/{day2_task_id}/codespace/init",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"githubUsername": "octocat"},
     )
     assert init_resp.status_code == 200, init_resp.text
 
     r2 = await async_client.post(
         f"/api/tasks/{day2_task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={},
     )
     assert r2.status_code == 201, r2.text
@@ -195,15 +213,15 @@ async def test_out_of_order_submission_rejected_400(
 
     invite = await invite_candidate(async_client, sim_id, recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
     # Candidate is on day 1, but tries to submit day 3
     day3_task_id = task_id_by_day(sim, 3)
 
     r = await async_client.post(
         f"/api/tasks/{day3_task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={},
     )
     assert r.status_code == 400, r.text
@@ -222,33 +240,37 @@ async def test_token_session_mismatch_rejected_404(
 
     sim = await create_simulation(async_client, recruiter_email)
 
-    invite_a = await invite_candidate(async_client, sim["id"], recruiter_email)
-    verification_a = await resolve_session(async_client, invite_a["token"])
-    token_a = verification_a["candidateToken"]
+    email_a = "jane@example.com"
+    invite_a = await invite_candidate(
+        async_client, sim["id"], recruiter_email, invite_email=email_a
+    )
+    verification_a = await resolve_session(async_client, invite_a["token"], email_a)
     cs_id_a = verification_a["candidateSessionId"]
 
-    invite_b = await invite_candidate(async_client, sim["id"], recruiter_email)
-    verification_b = await resolve_session(async_client, invite_b["token"])
-    token_b = verification_b["candidateToken"]
+    email_b = "other@example.com"
+    invite_b = await invite_candidate(
+        async_client, sim["id"], recruiter_email, invite_email=email_b
+    )
+    verification_b = await resolve_session(async_client, invite_b["token"], email_b)
     cs_id_b = verification_b["candidateSessionId"]
 
-    current_b = await get_current_task(async_client, cs_id_b, token_b)
+    current_b = await get_current_task(async_client, cs_id_b, email_b)
     task_id_b = current_b["currentTask"]["id"]
 
-    # token A + session B => safe 404
+    # email A + session B => forbidden
     r = await async_client.post(
         f"/api/tasks/{task_id_b}/submit",
-        headers={"x-candidate-token": token_a, "x-candidate-session-id": str(cs_id_b)},
+        headers=candidate_headers(cs_id_b, email_a),
         json={"contentText": "nope"},
     )
-    assert r.status_code == 404, r.text
+    assert r.status_code == 403, r.text
 
     # sanity: A can still submit its own task
-    current_a = await get_current_task(async_client, cs_id_a, token_a)
+    current_a = await get_current_task(async_client, cs_id_a, email_a)
     task_id_a = current_a["currentTask"]["id"]
     r_ok = await async_client.post(
         f"/api/tasks/{task_id_a}/submit",
-        headers={"x-candidate-token": token_a, "x-candidate-session-id": str(cs_id_a)},
+        headers=candidate_headers(cs_id_a, email_a),
         json={"contentText": "ok"},
     )
     assert r_ok.status_code == 201, r_ok.text
@@ -268,22 +290,22 @@ async def test_duplicate_submission_409(
     sim = await create_simulation(async_client, recruiter_email)
     invite = await invite_candidate(async_client, sim["id"], recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
-    current = await get_current_task(async_client, cs_id, token)
+    current = await get_current_task(async_client, cs_id, candidate_email)
     task_id = current["currentTask"]["id"]
 
     r1 = await async_client.post(
         f"/api/tasks/{task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"contentText": "first"},
     )
     assert r1.status_code == 201, r1.text
 
     r2 = await async_client.post(
         f"/api/tasks/{task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"contentText": "second"},
     )
     assert r2.status_code == 409, r2.text
@@ -303,15 +325,15 @@ async def test_text_submission_requires_content(
     sim = await create_simulation(async_client, recruiter_email)
     invite = await invite_candidate(async_client, sim["id"], recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
-    current = await get_current_task(async_client, cs_id, token)
+    current = await get_current_task(async_client, cs_id, candidate_email)
     task_id = current["currentTask"]["id"]
 
     res = await async_client.post(
         f"/api/tasks/{task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"contentText": "   "},
     )
     assert res.status_code == 400
@@ -332,26 +354,26 @@ async def test_code_submission_requires_workspace(
     sim = await create_simulation(async_client, recruiter_email)
     invite = await invite_candidate(async_client, sim["id"], recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
     # Complete day 1 (text) to advance to day 2 (code)
-    day1 = await get_current_task(async_client, cs_id, token)
+    day1 = await get_current_task(async_client, cs_id, candidate_email)
     day1_task_id = day1["currentTask"]["id"]
     ok = await async_client.post(
         f"/api/tasks/{day1_task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={"contentText": "design answer"},
     )
     assert ok.status_code == 201, ok.text
 
-    day2 = await get_current_task(async_client, cs_id, token)
+    day2 = await get_current_task(async_client, cs_id, candidate_email)
     assert day2["currentDayIndex"] == 2
     day2_task_id = day2["currentTask"]["id"]
 
     res = await async_client.post(
         f"/api/tasks/{day2_task_id}/submit",
-        headers={"x-candidate-token": token, "x-candidate-session-id": str(cs_id)},
+        headers=candidate_headers(cs_id, candidate_email),
         json={},
     )
     assert res.status_code == 400
@@ -373,8 +395,8 @@ async def test_submitting_all_tasks_marks_session_complete(
     sim = await create_simulation(async_client, recruiter_email)
     invite = await invite_candidate(async_client, sim["id"], recruiter_email)
     verification = await resolve_session(async_client, invite["token"])
-    token = verification["candidateToken"]
     cs_id = verification["candidateSessionId"]
+    candidate_email = "jane@example.com"
 
     payloads_by_day = {
         1: {"contentText": "day1 design"},
@@ -386,27 +408,21 @@ async def test_submitting_all_tasks_marks_session_complete(
 
     last_response = None
     for day_index in range(1, 6):
-        current = await get_current_task(async_client, cs_id, token)
+        current = await get_current_task(async_client, cs_id, candidate_email)
         assert current["currentDayIndex"] == day_index
         task_id = current["currentTask"]["id"]
 
         if current["currentTask"]["type"] in {"code", "debug"}:
             init_resp = await async_client.post(
                 f"/api/tasks/{task_id}/codespace/init",
-                headers={
-                    "x-candidate-token": token,
-                    "x-candidate-session-id": str(cs_id),
-                },
+                headers=candidate_headers(cs_id, candidate_email),
                 json={"githubUsername": "octocat"},
             )
             assert init_resp.status_code == 200, init_resp.text
 
         last_response = await async_client.post(
             f"/api/tasks/{task_id}/submit",
-            headers={
-                "x-candidate-token": token,
-                "x-candidate-session-id": str(cs_id),
-            },
+            headers=candidate_headers(cs_id, candidate_email),
             json=payloads_by_day[day_index],
         )
         assert last_response.status_code == 201, last_response.text

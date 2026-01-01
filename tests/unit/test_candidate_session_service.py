@@ -6,11 +6,28 @@ import pytest
 from fastapi import HTTPException
 
 from app.domains.candidate_sessions import service as cs_service
+from app.infra.security.principal import Principal
 from tests.factories import (
     create_candidate_session,
     create_recruiter,
     create_simulation,
 )
+
+
+def _principal(email: str) -> Principal:
+    return Principal(
+        sub=f"auth0|{email}",
+        email=email,
+        name=email.split("@")[0],
+        roles=[],
+        permissions=["candidate:access"],
+        claims={
+            "sub": f"auth0|{email}",
+            "email": email,
+            "https://simuhire.com/email": email,
+            "permissions": ["candidate:access"],
+        },
+    )
 
 
 @pytest.mark.asyncio
@@ -37,18 +54,14 @@ async def test_fetch_by_token_expired(async_session):
 
 
 @pytest.mark.asyncio
-async def test_fetch_by_id_and_token_mismatch(async_session):
+async def test_fetch_owned_session_mismatch(async_session):
     recruiter = await create_recruiter(async_session, email="mismatch@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
-    cs = await create_candidate_session(
-        async_session,
-        simulation=sim,
-        status="in_progress",
-        access_token="tok-mismatch",
-    )
+    cs = await create_candidate_session(async_session, simulation=sim)
+    principal = _principal("other@example.com")
     with pytest.raises(HTTPException) as excinfo:
-        await cs_service.fetch_by_id_and_token(async_session, cs.id, "wrong-token")
-    assert excinfo.value.status_code == 404
+        await cs_service.fetch_owned_session(async_session, cs.id, principal)
+    assert excinfo.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -75,66 +88,56 @@ async def test_fetch_by_token_success(async_session):
 
 
 @pytest.mark.asyncio
-async def test_fetch_by_id_and_token_success(async_session):
+async def test_fetch_owned_session_success(async_session):
     recruiter = await create_recruiter(async_session, email="ok2@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
-    cs = await create_candidate_session(
-        async_session,
-        simulation=sim,
-        status="in_progress",
-        access_token="tok-success",
-    )
-    loaded = await cs_service.fetch_by_id_and_token(
-        async_session, cs.id, cs.access_token
-    )
+    cs = await create_candidate_session(async_session, simulation=sim)
+    principal = _principal(cs.invite_email)
+    loaded = await cs_service.fetch_owned_session(async_session, cs.id, principal)
     assert loaded.id == cs.id
 
 
 @pytest.mark.asyncio
-async def test_fetch_by_id_and_token_expired_access_token(async_session):
+async def test_fetch_owned_session_expired(async_session):
     recruiter = await create_recruiter(async_session, email="expired-token@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
         async_session,
         simulation=sim,
         status="in_progress",
-        access_token="tok-expired",
-        access_token_expires_in_minutes=-5,
+        expires_in_days=-1,
     )
+    principal = _principal(cs.invite_email)
     with pytest.raises(HTTPException) as excinfo:
-        await cs_service.fetch_by_id_and_token(
-            async_session, cs.id, cs.access_token, now=datetime.now(UTC)
-        )
-    assert excinfo.value.status_code == 401
+        await cs_service.fetch_owned_session(async_session, cs.id, principal)
+    assert excinfo.value.status_code == 410
 
 
 @pytest.mark.asyncio
-async def test_verify_email_and_issue_token(async_session):
+async def test_claim_invite_with_principal(async_session):
     recruiter = await create_recruiter(async_session, email="verify@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(
         async_session, simulation=sim, status="not_started"
     )
-    old_access_token = cs.access_token
+    principal = _principal(cs.invite_email)
 
-    verified = await cs_service.verify_email_and_issue_token(
-        async_session, cs.token, cs.invite_email, now=datetime.now(UTC)
+    verified = await cs_service.claim_invite_with_principal(
+        async_session, cs.token, principal
     )
     assert verified.status == "in_progress"
     assert verified.started_at is not None
-    assert verified.access_token
-    assert verified.access_token_expires_at is not None
-    assert verified.access_token != old_access_token
+    assert verified.candidate_auth0_sub == principal.sub
+    assert verified.candidate_email == cs.invite_email
 
 
 @pytest.mark.asyncio
-async def test_verify_email_mismatch(async_session):
+async def test_claim_invite_email_mismatch(async_session):
     recruiter = await create_recruiter(async_session, email="verify-mismatch@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(async_session, simulation=sim)
 
+    principal = _principal("wrong@example.com")
     with pytest.raises(HTTPException) as excinfo:
-        await cs_service.verify_email_and_issue_token(
-            async_session, cs.token, "wrong@example.com", now=datetime.now(UTC)
-        )
-    assert excinfo.value.status_code == 401
+        await cs_service.claim_invite_with_principal(async_session, cs.token, principal)
+    assert excinfo.value.status_code == 403

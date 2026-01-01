@@ -51,6 +51,9 @@ class AuthSettings(BaseSettings):
     AUTH0_JWKS_URL: str | None = None
     AUTH0_API_AUDIENCE: str = ""
     AUTH0_ALGORITHMS: str = "RS256"
+    AUTH0_EMAIL_CLAIM: str = "https://simuhire.com/email"
+    AUTH0_ROLES_CLAIM: str = "https://simuhire.com/roles"
+    AUTH0_PERMISSIONS_CLAIM: str = "https://simuhire.com/permissions"
 
     model_config = SettingsConfigDict(extra="ignore")
 
@@ -170,6 +173,9 @@ class Settings(BaseSettings):
             "AUTH0_JWKS_URL",
             "AUTH0_API_AUDIENCE",
             "AUTH0_ALGORITHMS",
+            "AUTH0_EMAIL_CLAIM",
+            "AUTH0_ROLES_CLAIM",
+            "AUTH0_PERMISSIONS_CLAIM",
         }
         cors_keys = {"CORS_ALLOW_ORIGINS", "CORS_ALLOW_ORIGIN_REGEX"}
         github_keys = {
@@ -219,6 +225,22 @@ class Settings(BaseSettings):
             data["github"] = github_data
 
         return data
+
+    @model_validator(mode="after")
+    def _fail_fast_auth(self):
+        """Fail fast when critical Auth0 settings are missing in non-test envs."""
+        env = str(self.ENV or "").lower()
+        if env != "test":
+            issuer = (self.auth.AUTH0_ISSUER or "").strip() or (
+                self.auth.AUTH0_DOMAIN and f"https://{self.auth.AUTH0_DOMAIN}/"
+            )
+            if not issuer:
+                raise ValueError(
+                    "AUTH0_ISSUER (or AUTH0_DOMAIN) must be set for Auth0 validation"
+                )
+            if not (self.auth.AUTH0_API_AUDIENCE or "").strip():
+                raise ValueError("AUTH0_API_AUDIENCE must be set for Auth0 validation")
+        return self
 
     # Backwards compatibility shims for existing imports
     @property

@@ -24,7 +24,9 @@ def test_decode_auth0_token_missing_kid(monkeypatch):
 
 
 def test_decode_auth0_token_key_not_found(monkeypatch):
-    monkeypatch.setattr(jwt, "get_unverified_header", lambda _t: {"kid": "missing"})
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "missing", "alg": "RS256"}
+    )
     monkeypatch.setattr(auth0, "get_jwks", lambda: {"keys": [{"kid": "other"}]})
 
     with pytest.raises(auth0.Auth0Error) as exc:
@@ -33,7 +35,9 @@ def test_decode_auth0_token_key_not_found(monkeypatch):
 
 
 def test_decode_auth0_token_invalid_signature(monkeypatch):
-    monkeypatch.setattr(jwt, "get_unverified_header", lambda _t: {"kid": "k1"})
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "k1", "alg": "RS256"}
+    )
     monkeypatch.setattr(auth0, "get_jwks", lambda: {"keys": [{"kid": "k1"}]})
 
     def bad_decode(token, key, algorithms, audience, issuer, options):
@@ -69,7 +73,9 @@ def test_get_jwks_fetches_and_caches(monkeypatch):
 
 def test_decode_auth0_token_success(monkeypatch):
     auth0.get_jwks.cache_clear()
-    monkeypatch.setattr(jwt, "get_unverified_header", lambda _t: {"kid": "kid1"})
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "kid1", "alg": "RS256"}
+    )
     monkeypatch.setattr(auth0, "get_jwks", lambda: {"keys": [{"kid": "kid1"}]})
     monkeypatch.setattr(
         jwt,
@@ -81,3 +87,47 @@ def test_decode_auth0_token_success(monkeypatch):
 
     claims = auth0.decode_auth0_token("tok")
     assert claims["email"] == "ok@example.com"
+
+
+def test_decode_auth0_token_invalid_issuer(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "kid1", "alg": "RS256"}
+    )
+    monkeypatch.setattr(auth0, "get_jwks", lambda: {"keys": [{"kid": "kid1"}]})
+
+    def bad_decode(token, key, algorithms, audience, issuer, options):
+        assert issuer == auth0.settings.auth0_issuer
+        raise JWTError("invalid issuer")
+
+    monkeypatch.setattr(jwt, "decode", bad_decode)
+
+    with pytest.raises(auth0.Auth0Error):
+        auth0.decode_auth0_token("tok")
+
+
+def test_decode_auth0_token_invalid_audience(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "kid1", "alg": "RS256"}
+    )
+    monkeypatch.setattr(auth0, "get_jwks", lambda: {"keys": [{"kid": "kid1"}]})
+
+    def bad_decode(token, key, algorithms, audience, issuer, options):
+        assert audience == auth0.settings.auth0_audience
+        raise JWTError("invalid audience")
+
+    monkeypatch.setattr(jwt, "decode", bad_decode)
+
+    with pytest.raises(auth0.Auth0Error):
+        auth0.decode_auth0_token("tok")
+
+
+def test_decode_auth0_token_rejects_unapproved_alg(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "kid1", "alg": "HS256"}
+    )
+    with pytest.raises(auth0.Auth0Error) as excinfo:
+        auth0.decode_auth0_token("tok")
+    assert "algorithm" in excinfo.value.detail

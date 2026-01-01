@@ -14,7 +14,12 @@ async def test_auth_me_creates_and_returns_user(
     """Auth endpoint should decode token and create user if missing."""
 
     def fake_decode_auth0_token(_token: str) -> dict[str, str]:
-        return {"email": "recruiter@example.com", "name": "Recruiter One"}
+        return {
+            "email": "recruiter@example.com",
+            "name": "Recruiter One",
+            "sub": "auth0|test",
+            "permissions": ["recruiter:access"],
+        }
 
     session_maker = async_sessionmaker(
         bind=async_session.bind, expire_on_commit=False, autoflush=False

@@ -7,11 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies.candidate_sessions import (
-    CandidateSessionAuth,
-    candidate_headers,
-    fetch_candidate_session,
-)
+from app.api.dependencies.candidate_sessions import candidate_session_from_headers
 from app.api.dependencies.github_native import get_actions_runner, get_github_client
 from app.domains import CandidateSession, Task
 from app.domains.candidate_sessions import service as cs_service
@@ -75,12 +71,14 @@ async def _compute_current_task(db: AsyncSession, cs: CandidateSession) -> Task 
 async def init_codespace(
     task_id: Annotated[int, Path(..., ge=1)],
     payload: CodespaceInitRequest,
-    auth: Annotated[CandidateSessionAuth, Depends(candidate_headers)],
+    candidate_session: Annotated[
+        CandidateSession, Depends(candidate_session_from_headers)
+    ],
     db: Annotated[AsyncSession, Depends(get_session)],
     github_client: Annotated[GithubClient, Depends(get_github_client)],
 ) -> CodespaceInitResponse:
     """Provision or return a GitHub workspace for the candidate task."""
-    cs = await fetch_candidate_session(db, auth)
+    cs = candidate_session
     _rate_limit_or_429(cs.id, "init")
     task = await submission_service.load_task_or_404(db, task_id)
     submission_service.ensure_task_belongs(task, cs)
@@ -132,11 +130,13 @@ async def init_codespace(
 )
 async def codespace_status(
     task_id: Annotated[int, Path(..., ge=1)],
-    auth: Annotated[CandidateSessionAuth, Depends(candidate_headers)],
+    candidate_session: Annotated[
+        CandidateSession, Depends(candidate_session_from_headers)
+    ],
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> CodespaceStatusResponse:
     """Return current workspace status for a task."""
-    cs = await fetch_candidate_session(db, auth)
+    cs = candidate_session
     task = await submission_service.load_task_or_404(db, task_id)
     submission_service.ensure_task_belongs(task, cs)
 
@@ -177,10 +177,12 @@ async def run_task_tests(
     payload: RunTestsRequest,
     db: Annotated[AsyncSession, Depends(get_session)],
     actions_runner: Annotated[GithubActionsRunner, Depends(get_actions_runner)],
-    auth: Annotated[CandidateSessionAuth, Depends(candidate_headers)],
+    candidate_session: Annotated[
+        CandidateSession, Depends(candidate_session_from_headers)
+    ],
 ) -> RunTestsResponse:
     """Trigger GitHub Actions tests for a code/debug task."""
-    cs = await fetch_candidate_session(db, auth)
+    cs = candidate_session
     _rate_limit_or_429(cs.id, "run")
     task = await submission_service.load_task_or_404(db, task_id)
     submission_service.ensure_task_belongs(task, cs)
@@ -258,10 +260,12 @@ async def get_run_result(
     run_id: Annotated[int, Path(..., ge=1)],
     db: Annotated[AsyncSession, Depends(get_session)],
     actions_runner: Annotated[GithubActionsRunner, Depends(get_actions_runner)],
-    auth: Annotated[CandidateSessionAuth, Depends(candidate_headers)],
+    candidate_session: Annotated[
+        CandidateSession, Depends(candidate_session_from_headers)
+    ],
 ) -> RunTestsResponse:
     """Fetch a previously-dispatched workflow run result for polling."""
-    cs = await fetch_candidate_session(db, auth)
+    cs = candidate_session
     _rate_limit_or_429(cs.id, "run")
     task = await submission_service.load_task_or_404(db, task_id)
     submission_service.ensure_task_belongs(task, cs)
@@ -319,13 +323,15 @@ async def get_run_result(
 async def submit_task(
     task_id: Annotated[int, Path(..., ge=1)],
     payload: SubmissionCreateRequest,
-    auth: Annotated[CandidateSessionAuth, Depends(candidate_headers)],
+    candidate_session: Annotated[
+        CandidateSession, Depends(candidate_session_from_headers)
+    ],
     db: Annotated[AsyncSession, Depends(get_session)],
     github_client: Annotated[GithubClient, Depends(get_github_client)],
     actions_runner: Annotated[GithubActionsRunner, Depends(get_actions_runner)],
 ) -> SubmissionCreateResponse:
     """Submit a task for a candidate session using GitHub Actions results."""
-    cs = await fetch_candidate_session(db, auth)
+    cs = candidate_session
     _rate_limit_or_429(cs.id, "submit")
 
     task = await submission_service.load_task_or_404(db, task_id)

@@ -12,8 +12,9 @@ def _task_id_by_day(sim_payload: dict, day_index: int) -> int:
 
 @pytest.mark.asyncio
 async def test_full_flow_invite_through_first_submission(
-    async_client, async_session, auth_header_factory
+    async_client, async_session, auth_header_factory, monkeypatch
 ):
+    monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
     recruiter = await create_recruiter(async_session, email="flow@test.com")
 
     sim_payload = {
@@ -38,17 +39,20 @@ async def test_full_flow_invite_through_first_submission(
     invite = invite_res.json()
 
     verify_res = await async_client.post(
-        f"/api/candidate/session/{invite['token']}/verify",
-        json={"email": "flow@example.com"},
+        f"/api/candidate/session/{invite['token']}/claim",
+        headers={"Authorization": "Bearer candidate:flow@example.com"},
     )
     assert verify_res.status_code == 200, verify_res.text
     verify_body = verify_res.json()
     cs_id = verify_body["candidateSessionId"]
-    candidate_token = verify_body["candidateToken"]
+    candidate_email = "flow@example.com"
 
     current_res = await async_client.get(
         f"/api/candidate/session/{cs_id}/current_task",
-        headers={"x-candidate-token": candidate_token},
+        headers={
+            "Authorization": f"Bearer candidate:{candidate_email}",
+            "x-candidate-session-id": str(cs_id),
+        },
     )
     assert current_res.status_code == 200, current_res.text
     assert current_res.json()["currentDayIndex"] == 1
@@ -57,7 +61,7 @@ async def test_full_flow_invite_through_first_submission(
     submit_res = await async_client.post(
         f"/api/tasks/{day1_task_id}/submit",
         headers={
-            "x-candidate-token": candidate_token,
+            "Authorization": f"Bearer candidate:{candidate_email}",
             "x-candidate-session-id": str(cs_id),
         },
         json={"contentText": "Day 1 answer"},

@@ -37,6 +37,11 @@ def decode_auth0_token(token: str) -> dict[str, Any]:
     if kid is None:
         raise Auth0Error("Token header missing kid")
 
+    alg = unverified_header.get("alg")
+    allowed_algs = settings.auth0_algorithms
+    if not alg or alg not in allowed_algs:
+        raise Auth0Error("Invalid token algorithm")
+
     jwks = get_jwks()
     key: dict[str, Any] | None = None
     for jwk in jwks.get("keys", []):

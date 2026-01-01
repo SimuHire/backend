@@ -48,10 +48,9 @@ class CandidateSessionVerifyRequest(APIModel):
 
 
 class CandidateSessionVerifyResponse(CandidateSessionResolveResponse):
-    """Session details plus a short-lived candidate token."""
+    """Backward-compatible alias for candidate session claim responses."""
 
-    candidateToken: str
-    tokenExpiresAt: datetime
+    pass
 
 
 class ProgressSummary(APIModel):
@@ -59,6 +58,23 @@ class ProgressSummary(APIModel):
 
     completed: int
     total: int
+
+
+class CandidateInviteListItem(APIModel):
+    """Dashboard-friendly invite summary for candidates."""
+
+    candidateSessionId: int
+    simulationId: int
+    simulationTitle: str
+    role: str
+    companyName: str | None
+    status: CandidateSessionStatus
+    progress: ProgressSummary
+    lastActivityAt: datetime | None
+    inviteCreatedAt: datetime | None
+    expiresAt: datetime | None
+    inviteToken: str | None = None
+    isExpired: bool
 
 
 class CurrentTaskResponse(APIModel):

@@ -4,16 +4,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession
 from app.domains.candidate_sessions import service as cs_service
+from app.infra.db import get_session
+from app.infra.security.principal import Principal, require_permissions
 
 
 @dataclass(frozen=True)
 class CandidateSessionAuth:
-    """Headers used to authenticate a candidate session."""
+    """Legacy candidate session auth headers."""
 
     session_id: int
     token: str
@@ -25,7 +27,7 @@ def candidate_headers(
         int | None, Header(alias="x-candidate-session-id")
     ] = None,
 ) -> CandidateSessionAuth:
-    """Require candidate session headers or raise 401."""
+    """Backward-compatible header parser for existing callers."""
     if not x_candidate_token or x_candidate_session_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -37,10 +39,28 @@ def candidate_headers(
 
 
 async def fetch_candidate_session(
-    db: AsyncSession,
-    auth: CandidateSessionAuth,
+    _db: AsyncSession, _auth: CandidateSessionAuth
 ) -> CandidateSession:
-    """Load a candidate session by headers or raise 404/410."""
-    return await cs_service.fetch_by_id_and_token(
-        db, auth.session_id, auth.token, now=datetime.now(UTC)
+    """Deprecated helper preserved for test monkeypatches."""
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Candidate token flow deprecated; use Auth0 bearer",
+    )
+
+
+async def candidate_session_from_headers(
+    principal: Annotated[Principal, Depends(require_permissions(["candidate:access"]))],
+    x_candidate_session_id: Annotated[
+        int | None, Header(alias="x-candidate-session-id")
+    ] = None,
+    db: Annotated[AsyncSession, Depends(get_session)] = None,
+) -> CandidateSession:
+    """Load a candidate session for the authenticated candidate."""
+    if x_candidate_session_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing candidate session headers",
+        )
+    return await cs_service.fetch_owned_session(
+        db, int(x_candidate_session_id), principal, now=datetime.now(UTC)
     )
