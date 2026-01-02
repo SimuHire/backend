@@ -12,9 +12,10 @@ concurrency:
 env:
   PYTHONPATH: ${{ github.workspace }}
   ENV: ci
-  AUTH0_DOMAIN: tenon.us.auth0.com
-  AUTH0_API_AUDIENCE: https://tenon.ai/api
-  AUTH0_ALGORITHMS: RS256
+  TENON_AUTH0_DOMAIN: tenon.us.auth0.com
+  TENON_AUTH0_ISSUER: https://tenon.ai/api
+  TENON_AUTH0_ALGORITHMS: RS256
+  TENON_AUTH0_CLAIM_NAMESPACE: https://tenon.ai
 
 jobs:
   lint:
