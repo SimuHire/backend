@@ -13,7 +13,9 @@ env:
   PYTHONPATH: ${{ github.workspace }}
   ENV: ci
   TENON_AUTH0_DOMAIN: tenon.us.auth0.com
-  TENON_AUTH0_ISSUER: https://tenon.ai/api
+  TENON_AUTH0_ISSUER: https://tenon.us.auth0.com/
+  TENON_AUTH0_JWKS_URL: https://tenon.us.auth0.com/.well-known/jwks.json
+  TENON_AUTH0_API_AUDIENCE: https://tenon.ai/api
   TENON_AUTH0_ALGORITHMS: RS256
   TENON_AUTH0_CLAIM_NAMESPACE: https://tenon.ai
 
@@ -64,8 +66,8 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/tenon_test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tenon_test
+      TENON_DATABASE_URL_SYNC: postgresql://postgres:postgres@localhost:5432/tenon_test
+      TENON_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tenon_test
 
     steps:
       - uses: actions/checkout@v4
