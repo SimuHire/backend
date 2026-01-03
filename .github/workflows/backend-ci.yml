@@ -89,7 +89,7 @@ jobs:
         run: poetry install --no-interaction --no-root
 
       - name: Run Alembic migrations
-        run: poetry run alembic upgrade head
+        run: poetry run alembic upgrade heads
 
       - name: Run tests
         run: poetry run pytest
