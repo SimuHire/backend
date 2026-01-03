@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "202504010001"
-down_revision: Union[str, Sequence[str], None] = "202505050003"
+down_revision: Union[str, Sequence[str], None] = "202503200001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -23,16 +23,17 @@ def upgrade() -> None:
     new_table = "fit_profiles"
 
     if old_table in inspector.get_table_names():
+        indexes = {idx["name"] for idx in inspector.get_indexes(old_table)}
+        uniques = {uc["name"] for uc in inspector.get_unique_constraints(old_table)}
+        pk = inspector.get_pk_constraint(old_table).get("name")
         op.rename_table(old_table, new_table)
 
-        indexes = {idx["name"] for idx in inspector.get_indexes(old_table)}
         if f"ix_{old_table}_candidate_session_id" in indexes:
             op.execute(
                 f"ALTER INDEX ix_{old_table}_candidate_session_id "
                 f"RENAME TO ix_{new_table}_candidate_session_id"
             )
 
-        uniques = {uc["name"] for uc in inspector.get_unique_constraints(old_table)}
         if f"uq_{old_table}_candidate_session_id" in uniques:
             op.execute(
                 f"ALTER TABLE {new_table} "
@@ -40,7 +41,6 @@ def upgrade() -> None:
                 f"TO uq_{new_table}_candidate_session_id"
             )
 
-        pk = inspector.get_pk_constraint(old_table).get("name")
         if pk == f"{old_table}_pkey":
             op.execute(
                 f"ALTER TABLE {new_table} "
