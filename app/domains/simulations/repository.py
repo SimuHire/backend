@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains import CandidateSession, Simulation
+from app.domains import CandidateSession, Simulation, Task
 
 
 async def list_with_candidate_counts(db: AsyncSession, user_id: int):
@@ -40,3 +40,18 @@ async def get_owned(
         Simulation.created_by == user_id,
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def get_owned_with_tasks(
+    db: AsyncSession, simulation_id: int, user_id: int
+) -> tuple[Simulation | None, list[Task]]:
+    """Fetch a simulation with tasks if owned by given user."""
+    sim = await get_owned(db, simulation_id, user_id)
+    if sim is None:
+        return None, []
+
+    tasks_stmt = (
+        select(Task).where(Task.simulation_id == sim.id).order_by(Task.day_index.asc())
+    )
+    tasks = (await db.execute(tasks_stmt)).scalars().all()
+    return sim, tasks

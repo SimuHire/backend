@@ -16,6 +16,8 @@ from app.domains.simulations import service as sim_service
 from app.domains.simulations.schemas import (
     SimulationCreate,
     SimulationCreateResponse,
+    SimulationDetailResponse,
+    SimulationDetailTask,
     SimulationListItem,
     TaskOut,
 )
@@ -77,6 +79,49 @@ async def create_simulation(
         tasks=[
             TaskOut(id=t.id, day_index=t.day_index, type=t.type, title=t.title)
             for t in created_tasks
+        ],
+    )
+
+
+@router.get(
+    "/{simulation_id}",
+    response_model=SimulationDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_simulation_detail(
+    simulation_id: int,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[Any, Depends(get_current_user)],
+):
+    """Return a simulation detail view for recruiters."""
+    ensure_recruiter_or_none(user)
+    sim, tasks = await sim_service.require_owned_simulation_with_tasks(
+        db, simulation_id, user.id
+    )
+
+    return SimulationDetailResponse(
+        id=sim.id,
+        title=sim.title,
+        templateKey=sim.template_key,
+        role=sim.role,
+        techStack=sim.tech_stack,
+        focus=sim.focus,
+        scenario=sim.scenario_template,
+        tasks=[
+            SimulationDetailTask(
+                dayIndex=task.day_index,
+                title=task.title,
+                type=task.type,
+                description=task.description,
+                rubric=None,
+                maxScore=task.max_score,
+                templateRepoFullName=(
+                    task.template_repo
+                    if task.day_index in {2, 3} and task.template_repo
+                    else None
+                ),
+            )
+            for task in tasks
         ],
     )
 

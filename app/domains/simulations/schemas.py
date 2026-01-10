@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 from app.domains.common.types import TaskType
 from app.domains.tasks.schemas_public import TaskPublic
@@ -17,6 +17,8 @@ __all__ = [
     "TaskOut",
     "SimulationCreateResponse",
     "SimulationListItem",
+    "SimulationDetailResponse",
+    "SimulationDetailTask",
     "TaskPublic",
 ]
 
@@ -80,3 +82,50 @@ class SimulationListItem(BaseModel):
     templateKey: str
     createdAt: datetime
     numCandidates: int
+
+
+class SimulationDetailTask(BaseModel):
+    """Task summary for recruiter simulation detail view."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    dayIndex: int
+    title: str | None = None
+    type: TaskType | None = None
+    description: str | None = None
+    rubric: str | list[str] | dict | None = None
+    maxScore: int | None = None
+    preProvisioned: bool | None = None
+    templateRepoFullName: str | None = None
+
+    @model_serializer(mode="plain")
+    def _serialize(self):
+        data = {
+            "dayIndex": self.dayIndex,
+            "title": self.title,
+            "type": self.type,
+            "description": self.description,
+            "rubric": self.rubric,
+        }
+        if self.maxScore is not None:
+            data["maxScore"] = self.maxScore
+        if self.preProvisioned is not None:
+            data["preProvisioned"] = self.preProvisioned
+        if self.templateRepoFullName is not None:
+            data["templateRepoFullName"] = self.templateRepoFullName
+        return data
+
+
+class SimulationDetailResponse(BaseModel):
+    """Detail view response for a simulation (recruiter-only)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str | None = None
+    templateKey: str | None = None
+    role: str | None = None
+    techStack: str | list[str] | None = None
+    focus: str | list[str] | None = None
+    scenario: str | None = None
+    tasks: list[SimulationDetailTask]
