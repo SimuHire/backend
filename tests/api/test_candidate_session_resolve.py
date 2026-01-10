@@ -47,8 +47,13 @@ async def _create_simulation(async_client, recruiter_email: str) -> int:
     return res.json()["id"]
 
 
-async def _invite_candidate(async_client, sim_id: int, recruiter_email: str) -> dict:
-    payload = {"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"}
+async def _invite_candidate(
+    async_client,
+    sim_id: int,
+    recruiter_email: str,
+    invite_email: str = "jane@example.com",
+) -> dict:
+    payload = {"candidateName": "Jane Doe", "inviteEmail": invite_email}
     res = await async_client.post(
         f"/api/simulations/{sim_id}/invite",
         json=payload,
@@ -416,9 +421,14 @@ async def test_bootstrap_wrong_email_forbidden(async_client, async_session):
     await _seed_recruiter(async_session, recruiter_email)
     sim_id = await _create_simulation(async_client, recruiter_email)
     invite = await _invite_candidate(async_client, sim_id, recruiter_email)
-    other_invite = await _invite_candidate(async_client, sim_id, recruiter_email)
+    other_invite = await _invite_candidate(
+        async_client,
+        sim_id,
+        recruiter_email,
+        invite_email="other@example.com",
+    )
     other_verification = await _verify(
-        async_client, async_session, other_invite["token"], "jane@example.com"
+        async_client, async_session, other_invite["token"], "other@example.com"
     )
     access_token = other_verification["candidateAccessToken"]
 
@@ -427,4 +437,4 @@ async def test_bootstrap_wrong_email_forbidden(async_client, async_session):
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert res.status_code == 403
-    assert res.json()["detail"] == "Not authorized for this invite"
+    assert res.json()["detail"] == "Sign in with invited email"

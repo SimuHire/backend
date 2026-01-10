@@ -3,6 +3,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Company, Submission, User
+from app.domains.github_native.workspaces.workspace import Workspace
+from tests.factories import (
+    create_candidate_session,
+    create_recruiter,
+    create_submission,
+)
+from tests.factories import (
+    create_simulation as create_simulation_factory,
+)
 
 
 async def seed_recruiter(
@@ -396,12 +405,49 @@ async def test_code_submission_uses_preprovisioned_workspace(
     assert day2["currentDayIndex"] == 2
     day2_task_id = day2["currentTask"]["id"]
 
+    workspace = (
+        await async_session.execute(
+            select(Workspace).where(
+                Workspace.candidate_session_id == cs_id,
+                Workspace.task_id == day2_task_id,
+            )
+        )
+    ).scalar_one_or_none()
+    assert workspace is not None
+
     res = await async_client.post(
         f"/api/tasks/{day2_task_id}/submit",
         headers=candidate_headers(cs_id, access_token),
         json={},
     )
     assert res.status_code == 201, res.text
+
+
+@pytest.mark.asyncio
+async def test_code_submission_requires_workspace_without_preprovision(
+    async_client, async_session: AsyncSession, actions_stubber
+):
+    actions_stubber()
+    recruiter = await create_recruiter(async_session, email="no-preprov@test.com")
+    sim, tasks = await create_simulation_factory(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress", access_token="tok"
+    )
+    await create_submission(
+        async_session,
+        candidate_session=cs,
+        task=tasks[0],
+        content_text="day1",
+    )
+    await async_session.commit()
+
+    res = await async_client.post(
+        f"/api/tasks/{tasks[1].id}/submit",
+        headers=candidate_headers(cs.id, cs.access_token),
+        json={},
+    )
+    assert res.status_code == 400
+    assert "Workspace not initialized" in res.json()["detail"]
 
 
 @pytest.mark.asyncio

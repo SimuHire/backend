@@ -59,6 +59,13 @@ async def test_create_invite_handles_token_collisions(monkeypatch):
         async def rollback(self):
             self.rollbacks += 1
 
+        async def execute(self, *_args, **_kwargs):
+            class _Result:
+                def scalar_one_or_none(self):
+                    return None
+
+            return _Result()
+
     with pytest.raises(Exception) as excinfo:
         await sim_service.create_invite(
             StubSession(),
@@ -102,6 +109,22 @@ async def test_create_invite_success(async_session):
     )
     assert cs.token
     assert cs.status == "not_started"
+
+
+@pytest.mark.asyncio
+async def test_create_invite_reuses_existing(async_session):
+    recruiter = await create_recruiter(async_session, email="reuse@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    payload = type(
+        "P", (), {"candidateName": "Jane", "inviteEmail": "jane@example.com"}
+    )
+    first = await sim_service.create_invite(
+        async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
+    )
+    second = await sim_service.create_invite(
+        async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
+    )
+    assert first.id == second.id
 
 
 @pytest.mark.asyncio

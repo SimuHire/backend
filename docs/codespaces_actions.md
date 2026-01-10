@@ -15,7 +15,7 @@ Tenon now runs code tasks entirely on GitHub: template repositories per task, Co
 
 ## Candidate flow (backend endpoints)
 0) `POST /api/simulations/{simulationId}/invite`
-   - Creates Day 2/Day 3 workspace repos from task templates (idempotent).
+   - Creates Day 2/Day 3 workspace repos from task templates (idempotent per simulation + invite email).
 1) `POST /api/tasks/{taskId}/codespace/init`
    - Creates repo from template; invites candidate via GitHub username.
    - Returns repo URL + Codespaces URL, default branch, workspace id, and stores `base_template_sha` (default branch head).

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, FitProfile, Simulation, Task
+from app.domains.candidate_sessions import repository as cs_repo
 from app.domains.candidate_sessions.schemas import CandidateInviteRequest
 from app.domains.simulations import repository as sim_repo
 from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
@@ -127,13 +128,19 @@ async def create_invite(
 ) -> CandidateSession:
     """Create a candidate session with random token, handling rare collisions."""
     now = now or datetime.now(UTC)
+    invite_email = str(payload.inviteEmail).lower()
+    existing = await cs_repo.get_by_simulation_and_email(
+        db, simulation_id=simulation_id, invite_email=invite_email
+    )
+    if existing:
+        return existing
     expires_at = now + timedelta(days=INVITE_TOKEN_TTL_DAYS)
     for _ in range(3):
         token = secrets.token_urlsafe(32)  # typically ~43 chars, url-safe
         cs = CandidateSession(
             simulation_id=simulation_id,
             candidate_name=payload.candidateName,
-            invite_email=str(payload.inviteEmail).lower(),
+            invite_email=invite_email,
             token=token,
             status="not_started",
             expires_at=expires_at,

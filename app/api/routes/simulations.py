@@ -154,11 +154,14 @@ async def create_candidate_invite(
     now = datetime.now(UTC)
     cs = await sim_service.create_invite(db, simulation_id, payload, now=now)
 
+    repo_prefix = settings.github.GITHUB_REPO_PREFIX
+    template_owner = settings.github.GITHUB_TEMPLATE_OWNER or settings.github.GITHUB_ORG
     try:
         for task in tasks:
+            task_type = (task.type or "").lower()
             if task.day_index not in {2, 3}:
                 continue
-            if not submission_service.is_code_task(task):
+            if task_type not in {"code", "debug"}:
                 continue
             await submission_service.ensure_workspace(
                 db,
@@ -166,17 +169,24 @@ async def create_candidate_invite(
                 task=task,
                 github_client=github_client,
                 github_username="",
-                repo_prefix=settings.github.GITHUB_REPO_PREFIX,
-                template_default_owner=settings.github.GITHUB_TEMPLATE_OWNER
-                or settings.github.GITHUB_ORG,
+                repo_prefix=repo_prefix,
+                template_default_owner=template_owner,
                 now=now,
             )
     except GithubError as exc:
+        template_repo = (task.template_repo or "").strip()
+        repo_name = submission_service.build_repo_name(
+            prefix=repo_prefix, candidate_session=cs, task=task
+        )
         logger.error(
             f"github_workspace_preprovision_failed {exc}",
             extra={
                 "simulation_id": simulation_id,
                 "candidate_session_id": cs.id,
+                "task_id": task.id,
+                "day_index": task.day_index,
+                "template_repo": template_repo,
+                "repo_name": repo_name,
                 "error": str(exc),
             },
         )

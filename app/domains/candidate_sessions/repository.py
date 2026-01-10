@@ -87,6 +87,18 @@ async def list_for_email(db: AsyncSession, email: str) -> list[CandidateSession]
     return list(res.scalars().unique().all())
 
 
+async def get_by_simulation_and_email(
+    db: AsyncSession, *, simulation_id: int, invite_email: str
+) -> CandidateSession | None:
+    """Return candidate session for a simulation + invite email (case-insensitive)."""
+    stmt = select(CandidateSession).where(
+        CandidateSession.simulation_id == simulation_id,
+        func.lower(CandidateSession.invite_email) == func.lower(invite_email),
+    )
+    res = await db.execute(stmt)
+    return res.scalar_one_or_none()
+
+
 async def last_submission_at(
     db: AsyncSession, candidate_session_id: int
 ) -> datetime | None:
