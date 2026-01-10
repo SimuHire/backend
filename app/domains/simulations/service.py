@@ -35,6 +35,18 @@ async def require_owned_simulation(
     return sim
 
 
+async def require_owned_simulation_with_tasks(
+    db: AsyncSession, simulation_id: int, user_id: int
+) -> tuple[Simulation, list[Task]]:
+    """Return simulation + tasks if recruiter owns it; otherwise raise 404."""
+    sim, tasks = await sim_repo.get_owned_with_tasks(db, simulation_id, user_id)
+    if sim is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found"
+        )
+    return sim, tasks
+
+
 async def list_simulations(db: AsyncSession, user_id: int):
     """List simulations with candidate counts for a recruiter."""
     return await sim_repo.list_with_candidate_counts(db, user_id)
