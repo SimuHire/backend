@@ -76,6 +76,48 @@ async def test_create_invite_handles_token_collisions(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_invite_integrity_error_returns_existing(monkeypatch):
+    existing = CandidateSession(
+        simulation_id=1,
+        candidate_name="Jane",
+        invite_email="jane@example.com",
+        token="token",
+        status="not_started",
+        expires_at=datetime.now(UTC),
+    )
+    existing.id = 123
+
+    class StubSession:
+        def __init__(self):
+            self.rollbacks = 0
+
+        def add(self, _obj):
+            return None
+
+        async def commit(self):
+            raise IntegrityError("", {}, None)
+
+        async def rollback(self):
+            self.rollbacks += 1
+
+    async def _get_existing(*_args, **_kwargs):
+        return existing
+
+    monkeypatch.setattr(
+        sim_service.cs_repo, "get_by_simulation_and_email", _get_existing
+    )
+    cs = await sim_service.create_invite(
+        StubSession(),
+        simulation_id=1,
+        payload=type(
+            "P", (), {"candidateName": "Jane", "inviteEmail": "jane@example.com"}
+        ),
+        now=datetime.now(UTC),
+    )
+    assert cs.id == existing.id
+
+
+@pytest.mark.asyncio
 async def test_create_simulation_with_tasks_flow(async_session, monkeypatch):
     payload = type(
         "P",
@@ -112,7 +154,7 @@ async def test_create_invite_success(async_session):
 
 
 @pytest.mark.asyncio
-async def test_create_invite_reuses_existing(async_session):
+async def test_create_invite_reuses_existing(async_session, monkeypatch):
     recruiter = await create_recruiter(async_session, email="reuse@test.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     payload = type(
@@ -121,10 +163,28 @@ async def test_create_invite_reuses_existing(async_session):
     first = await sim_service.create_invite(
         async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
     )
+    first_id = first.id
+    fail_once = True
+    original_commit = async_session.commit
+
+    async def _commit_with_integrity_error():
+        nonlocal fail_once
+        if fail_once:
+            fail_once = False
+            raise IntegrityError("", {}, None)
+        return await original_commit()
+
+    async def _get_existing(*_args, **_kwargs):
+        return type("S", (), {"id": first_id})()
+
+    monkeypatch.setattr(async_session, "commit", _commit_with_integrity_error)
+    monkeypatch.setattr(
+        sim_service.cs_repo, "get_by_simulation_and_email", _get_existing
+    )
     second = await sim_service.create_invite(
         async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
     )
-    assert first.id == second.id
+    assert second.id == first_id
 
 
 @pytest.mark.asyncio

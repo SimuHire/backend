@@ -129,11 +129,6 @@ async def create_invite(
     """Create a candidate session with random token, handling rare collisions."""
     now = now or datetime.now(UTC)
     invite_email = str(payload.inviteEmail).lower()
-    existing = await cs_repo.get_by_simulation_and_email(
-        db, simulation_id=simulation_id, invite_email=invite_email
-    )
-    if existing:
-        return existing
     expires_at = now + timedelta(days=INVITE_TOKEN_TTL_DAYS)
     for _ in range(3):
         token = secrets.token_urlsafe(32)  # typically ~43 chars, url-safe
@@ -153,6 +148,11 @@ async def create_invite(
             return cs
         except IntegrityError:
             await db.rollback()
+            existing = await cs_repo.get_by_simulation_and_email(
+                db, simulation_id=simulation_id, invite_email=invite_email
+            )
+            if existing:
+                return existing
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

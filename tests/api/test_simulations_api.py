@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies.github_native import get_github_client
 from app.api.dependencies.notifications import get_email_service
@@ -172,7 +173,7 @@ async def test_invite_preprovisions_day2_day3_workspaces(
 
 @pytest.mark.asyncio
 async def test_invite_github_failure_reuses_candidate_session(
-    async_client, async_session, auth_header_factory, override_dependencies
+    async_client, async_session, auth_header_factory, override_dependencies, monkeypatch
 ):
     recruiter = await create_recruiter(async_session, email="fail@app.com")
     sim, tasks = await create_simulation(async_session, created_by=recruiter)
@@ -180,6 +181,8 @@ async def test_invite_github_failure_reuses_candidate_session(
     day3_task = next(t for t in tasks if t.day_index == 3)
     day2_task.type = "code"
     day3_task.type = "debug"
+    day2_task_id = day2_task.id
+    day3_task_id = day3_task.id
     await async_session.commit()
 
     class FailingGithubClient:
@@ -237,6 +240,18 @@ async def test_invite_github_failure_reuses_candidate_session(
     )
     assert len(existing) == 1
 
+    fail_once = True
+    original_commit = async_session.commit
+
+    async def _commit_with_integrity_error():
+        nonlocal fail_once
+        if fail_once:
+            fail_once = False
+            raise IntegrityError("", {}, None)
+        return await original_commit()
+
+    monkeypatch.setattr(async_session, "commit", _commit_with_integrity_error)
+
     with override_dependencies(
         {
             get_email_service: lambda: email_service,
@@ -263,7 +278,7 @@ async def test_invite_github_failure_reuses_candidate_session(
         .scalars()
         .all()
     )
-    assert {ws.task_id for ws in workspaces} == {day2_task.id, day3_task.id}
+    assert {ws.task_id for ws in workspaces} == {day2_task_id, day3_task_id}
 
 
 @pytest.mark.asyncio

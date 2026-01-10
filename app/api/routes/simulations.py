@@ -1,5 +1,6 @@
 import logging
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -151,13 +152,23 @@ async def create_candidate_invite(
     sim, tasks = await sim_service.require_owned_simulation_with_tasks(
         db, simulation_id, user.id
     )
+    sim_snapshot = SimpleNamespace(title=sim.title, role=sim.role)
+    task_snapshots = [
+        SimpleNamespace(
+            id=task.id,
+            day_index=task.day_index,
+            type=task.type,
+            template_repo=task.template_repo,
+        )
+        for task in tasks
+    ]
     now = datetime.now(UTC)
     cs = await sim_service.create_invite(db, simulation_id, payload, now=now)
 
     repo_prefix = settings.github.GITHUB_REPO_PREFIX
     template_owner = settings.github.GITHUB_TEMPLATE_OWNER or settings.github.GITHUB_ORG
     try:
-        for task in tasks:
+        for task in task_snapshots:
             task_type = (task.type or "").lower()
             if task.day_index not in {2, 3}:
                 continue
@@ -198,7 +209,7 @@ async def create_candidate_invite(
     await notification_service.send_invite_email(
         db,
         candidate_session=cs,
-        simulation=sim,
+        simulation=sim_snapshot,
         invite_url=sim_service.invite_url(cs.token),
         email_service=email_service,
         now=now,

@@ -12,12 +12,19 @@ from app.api.routes import simulations as recruiter_sims
 async def test_create_candidate_invite_happy_path(monkeypatch):
     user = SimpleNamespace(id=1)
     cs = SimpleNamespace(id=2, token="tok")
-    task_day2 = SimpleNamespace(id=10, day_index=2, type="code")
-    task_day3 = SimpleNamespace(id=11, day_index=3, type="debug")
+    task_day2 = SimpleNamespace(
+        id=10, day_index=2, type="code", template_repo="org/template"
+    )
+    task_day3 = SimpleNamespace(
+        id=11, day_index=3, type="debug", template_repo="org/template"
+    )
 
     async def _require_owned_with_tasks(db, simulation_id, recruiter_id):
         assert recruiter_id == user.id
-        return SimpleNamespace(id=simulation_id), [task_day2, task_day3]
+        return (
+            SimpleNamespace(id=simulation_id, title="Sim", role="Engineer"),
+            [task_day2, task_day3],
+        )
 
     async def _create_invite(db, simulation_id, payload, now):
         assert payload.candidateName == "Name"
