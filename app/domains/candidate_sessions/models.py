@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db.base import Base
@@ -12,6 +12,13 @@ class CandidateSession(Base):
     """Candidate session record for invited candidates."""
 
     __tablename__ = "candidate_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "simulation_id",
+            "invite_email",
+            name="uq_candidate_session_simulation_invite_email",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     simulation_id: Mapped[int] = mapped_column(

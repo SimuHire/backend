@@ -152,7 +152,7 @@ async def create_candidate_invite(
     sim, tasks = await sim_service.require_owned_simulation_with_tasks(
         db, simulation_id, user.id
     )
-    sim_snapshot = SimpleNamespace(title=sim.title, role=sim.role)
+    sim_snapshot = SimpleNamespace(id=sim.id, title=sim.title, role=sim.role)
     task_snapshots = [
         SimpleNamespace(
             id=task.id,
@@ -169,7 +169,7 @@ async def create_candidate_invite(
     template_owner = settings.github.GITHUB_TEMPLATE_OWNER or settings.github.GITHUB_ORG
     try:
         for task in task_snapshots:
-            task_type = (task.type or "").lower()
+            task_type = str(task.type or "").lower()
             if task.day_index not in {2, 3}:
                 continue
             if task_type not in {"code", "debug"}:

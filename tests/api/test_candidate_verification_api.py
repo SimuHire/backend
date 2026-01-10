@@ -291,7 +291,9 @@ async def test_candidate_access_token_session_mismatch(
     recruiter, sim, cs = await _seed_candidate_session(async_session)
     provider = MemoryEmailProvider()
     email_service = EmailService(provider, sender="noreply@test.com")
-    other = await create_candidate_session(async_session, simulation=sim)
+    other = await create_candidate_session(
+        async_session, simulation=sim, invite_email="other@example.com"
+    )
 
     with override_dependencies({get_email_service: lambda: email_service}):
         await async_client.post(

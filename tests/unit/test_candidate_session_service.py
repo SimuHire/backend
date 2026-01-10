@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -145,3 +146,14 @@ async def test_claim_invite_email_mismatch(async_session):
     with pytest.raises(HTTPException) as excinfo:
         await cs_service.claim_invite_with_principal(async_session, cs.token, principal)
     assert excinfo.value.status_code == 403
+
+
+def test_normalize_email_non_string():
+    assert cs_service._normalize_email(123) == ""
+
+
+def test_ensure_email_match_missing_email():
+    cs = SimpleNamespace(invite_email="jane@example.com", candidate_email=None)
+    with pytest.raises(HTTPException) as excinfo:
+        cs_service._ensure_email_match(cs, "")
+    assert excinfo.value.status_code == 400
