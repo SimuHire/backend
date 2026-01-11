@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 from contextlib import contextmanager
 
@@ -65,6 +66,14 @@ async def async_client(db_session: AsyncSession):
     """FastAPI TestClient wired to the shared async session + auth override."""
 
     class StubGithubClient:
+        _workflow_text = "\n".join(
+            [
+                "uses: actions/upload-artifact@v4",
+                "name: tenon-test-results",
+                "path: artifacts/tenon-test-results.json",
+            ]
+        )
+
         async def generate_repo_from_template(
             self,
             *,
@@ -86,6 +95,17 @@ async def async_client(db_session: AsyncSession):
 
         async def get_branch(self, repo_full_name: str, branch: str):
             return {"commit": {"sha": "base-sha-123"}}
+
+        async def get_repo(self, repo_full_name: str):
+            return {"default_branch": "main"}
+
+        async def get_file_contents(
+            self, repo_full_name: str, file_path: str, *, ref: str | None = None
+        ):
+            encoded = base64.b64encode(self._workflow_text.encode("utf-8")).decode(
+                "ascii"
+            )
+            return {"content": encoded, "encoding": "base64"}
 
         async def get_compare(self, repo_full_name: str, base: str, head: str):
             return {"ahead_by": 0, "behind_by": 0, "total_commits": 0, "files": []}

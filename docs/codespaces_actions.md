@@ -13,6 +13,16 @@ Tenon now runs code tasks entirely on GitHub: template repositories per task, Co
 - To add a new template: add to the catalog module, create a migration/backfill if needed, ensure the GitHub template repo has the Actions workflow.
 - Workflow file: `TENON_GITHUB_ACTIONS_WORKFLOW_FILE` (e.g., `tenon-ci.yml`) must exist in each template.
 
+## Template health check (admin)
+- Requires `X-Admin-Key` header matching `TENON_ADMIN_API_KEY`.
+- `GET /api/admin/templates/health?mode=static` validates each template repo's default branch, workflow file, and artifact contract (static).
+- `POST /api/admin/templates/health/run` runs live dispatch + artifact validation (opt-in).
+- Failures return per-template errors like `workflow_file_missing`, `workflow_run_not_success`, or `test_results_json_invalid_schema`.
+
+CLI:
+- Static check all: `poetry run python scripts/template_health_check.py --mode static --all`
+- Live check all (bounded): `poetry run python scripts/template_health_check.py --mode live --all --concurrency 2 --timeout-seconds 180`
+
 ## Candidate flow (backend endpoints)
 0) `POST /api/simulations/{simulationId}/invite`
    - Creates Day 2/Day 3 workspace repos from task templates (idempotent per simulation + invite email).

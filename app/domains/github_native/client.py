@@ -124,6 +124,21 @@ class GithubClient:
         path = f"/repos/{owner}/{repo}/branches/{branch}"
         return await self._get_json(path)
 
+    async def get_repo(self, repo_full_name: str) -> dict[str, Any]:
+        """Fetch repository details."""
+        owner, repo = self._split_full_name(repo_full_name)
+        path = f"/repos/{owner}/{repo}"
+        return await self._get_json(path)
+
+    async def get_file_contents(
+        self, repo_full_name: str, file_path: str, *, ref: str | None = None
+    ) -> dict[str, Any]:
+        """Fetch repository file contents."""
+        owner, repo = self._split_full_name(repo_full_name)
+        path = f"/repos/{owner}/{repo}/contents/{file_path}"
+        params = {"ref": ref} if ref else None
+        return await self._get_json(path, params=params)
+
     async def get_compare(
         self, repo_full_name: str, base: str, head: str
     ) -> dict[str, Any]:

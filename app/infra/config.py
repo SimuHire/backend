@@ -218,6 +218,7 @@ class Settings(BaseSettings):
     email: EmailSettings = Field(default_factory=EmailSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
+    ADMIN_API_KEY: str = ""
 
     @model_validator(mode="before")
     def _merge_legacy(cls, values: dict) -> dict:

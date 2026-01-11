@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    admin_templates,
     auth,
     candidate_sessions,
     health,
@@ -95,6 +96,11 @@ def _register_routers(app: FastAPI) -> None:
     prefix = settings.API_PREFIX
     app.include_router(health.router, prefix="", tags=["health"])
     app.include_router(auth.router, prefix=f"{prefix}/auth", tags=["auth"])
+    app.include_router(
+        admin_templates.router,
+        prefix=f"{prefix}/admin",
+        tags=["admin"],
+    )
     app.include_router(
         simulations.router,
         prefix=f"{prefix}/simulations",
