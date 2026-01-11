@@ -41,8 +41,9 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
   - `GET /api/simulations/{id}/candidates` list sessions (`hasFitProfile` if `fit_profiles` row)
   - `GET /api/submissions` list submissions (filters `candidateSessionId`, `taskId`)
   - `GET /api/submissions/{id}` detail with content/code/test results + repo/commit/workflow/diff URLs
-- Admin (recruiter auth):
-  - `GET /api/admin/templates/health` validate template repos, workflow file, and artifact contract
+- Admin (X-Admin-Key):
+  - `GET /api/admin/templates/health` static validate template repos and workflow file
+  - `POST /api/admin/templates/health/run` live dispatch + artifact validation (opt-in)
 - Candidate (Auth0 access token + invite token):
   - `POST /api/candidate/session/{token}/verify` (Auth0 `Authorization: Bearer <access_token>`) claims invite for the logged-in candidate and transitions to in-progress
   - `GET /api/candidate/session/{token}` same as verify (idempotent claim/bootstrap with Auth0 identity)
@@ -70,6 +71,14 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 - Tests: `poetry run pytest` (property tests under `tests/property`).
 - Dev auth: set `DEV_AUTH_BYPASS=1` and send header `x-dev-user-email: recruiter1@local.test` for recruiter endpoints; candidate endpoints require Auth0 bearer tokens (tests may still use `x-candidate-session-id` helper headers).
 
+## Template Health Checks
+
+- Admin API: `X-Admin-Key: <TENON_ADMIN_API_KEY>` required.
+- Static check: `GET /api/admin/templates/health?mode=static`
+- Live check: `POST /api/admin/templates/health/run` with `{ "templateKeys": [...], "mode": "live", "timeoutSeconds": 180 }`
+- CLI static all: `poetry run python scripts/template_health_check.py --mode static --all`
+- CLI live all: `poetry run python scripts/template_health_check.py --mode live --all --concurrency 2 --timeout-seconds 180`
+
 ## Configuration
 
 - DB: `TENON_DATABASE_URL`, `TENON_DATABASE_URL_SYNC` (sync used by Alembic; async derived automatically; SQLite fallback `local.db` if unset).
@@ -78,6 +87,7 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 - CORS: `TENON_CORS_ALLOW_ORIGINS` (JSON array or comma list), `TENON_CORS_ALLOW_ORIGIN_REGEX`.
 - Candidate portal: `TENON_CANDIDATE_PORTAL_BASE_URL` (used for invite links).
 - GitHub: `TENON_GITHUB_API_BASE`, `TENON_GITHUB_ORG`, `TENON_GITHUB_TEMPLATE_OWNER`, `TENON_GITHUB_REPO_PREFIX`, `TENON_GITHUB_ACTIONS_WORKFLOW_FILE`, `TENON_GITHUB_TOKEN`, `TENON_GITHUB_CLEANUP_ENABLED` (future).
+- Admin: `TENON_ADMIN_API_KEY` (required for admin endpoints).
 - Dev bypass: `DEV_AUTH_BYPASS=1` (local only; app aborts otherwise).
 
 ## Roadmap (not implemented yet)
