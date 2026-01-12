@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -17,22 +16,25 @@ from tests.factories import (
 )
 
 
-def _principal(email: str) -> Principal:
+def _principal(email: str, *, email_verified: bool | None = None) -> Principal:
     email_claim = settings.auth.AUTH0_EMAIL_CLAIM
     permissions_claim = settings.auth.AUTH0_PERMISSIONS_CLAIM
+    claims = {
+        "sub": f"auth0|{email}",
+        "email": email,
+        email_claim: email,
+        "permissions": ["candidate:access"],
+        permissions_claim: ["candidate:access"],
+    }
+    if email_verified is not None:
+        claims["email_verified"] = email_verified
     return Principal(
         sub=f"auth0|{email}",
         email=email,
         name=email.split("@")[0],
         roles=[],
         permissions=["candidate:access"],
-        claims={
-            "sub": f"auth0|{email}",
-            "email": email,
-            email_claim: email,
-            "permissions": ["candidate:access"],
-            permissions_claim: ["candidate:access"],
-        },
+        claims=claims,
     )
 
 
@@ -67,7 +69,7 @@ async def test_fetch_owned_session_mismatch(async_session):
     principal = _principal("other@example.com")
     with pytest.raises(HTTPException) as excinfo:
         await cs_service.fetch_owned_session(async_session, cs.id, principal)
-    assert excinfo.value.status_code == 403
+    assert excinfo.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -146,18 +148,35 @@ async def test_claim_invite_email_mismatch(async_session):
     principal = _principal("wrong@example.com")
     with pytest.raises(HTTPException) as excinfo:
         await cs_service.claim_invite_with_principal(async_session, cs.token, principal)
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_claim_invite_requires_verified_email(async_session):
+    recruiter = await create_recruiter(async_session, email="verify-req@sim.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+    principal = _principal(cs.invite_email, email_verified=False)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.claim_invite_with_principal(async_session, cs.token, principal)
+    assert excinfo.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_claim_invite_missing_email_claim(async_session):
+    recruiter = await create_recruiter(async_session, email="missing-email@sim.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+    principal = _principal("", email_verified=True)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.claim_invite_with_principal(async_session, cs.token, principal)
     assert excinfo.value.status_code == 403
 
 
 def test_normalize_email_non_string():
     assert cs_service._normalize_email(123) == ""
-
-
-def test_ensure_email_match_missing_email():
-    cs = SimpleNamespace(invite_email="jane@example.com", candidate_email=None)
-    with pytest.raises(HTTPException) as excinfo:
-        cs_service._ensure_email_match(cs, "")
-    assert excinfo.value.status_code == 400
 
 
 @pytest.mark.asyncio

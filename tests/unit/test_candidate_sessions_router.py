@@ -43,19 +43,8 @@ class StubSession:
 
 
 @pytest.mark.asyncio
-async def test_resolve_candidate_session_requires_verification(monkeypatch):
+async def test_resolve_candidate_session_propagates_claim_error(monkeypatch):
     stub_db = StubSession()
-    cs = SimpleNamespace(
-        id=1,
-        status="not_started",
-        started_at=None,
-        completed_at=None,
-        candidate_name="Jane",
-        simulation=SimpleNamespace(id=10, title="Sim", role="Backend"),
-    )
-
-    async def _return_cs(*_a, **_k):
-        return cs
 
     async def _claim(*_a, **_k):
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -83,7 +72,7 @@ async def test_get_current_task_marks_completed(monkeypatch):
         id=99, day_index=3, title="Task", type="code", description="desc"
     )
 
-    async def _fetch_by_id(db, session_id, token, now):
+    async def _fetch_by_id(db, session_id, principal, now):
         assert session_id == cs.id
         return cs
 
@@ -117,8 +106,7 @@ async def test_get_current_task_marks_completed(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("path", ["claim", "verify"])
-async def test_claim_and_verify_routes_share_logic(monkeypatch, path: str):
+async def test_claim_route_uses_claim_service(monkeypatch):
     stub_db = StubSession()
     expires_at = datetime.now(UTC)
     cs = SimpleNamespace(
@@ -127,8 +115,6 @@ async def test_claim_and_verify_routes_share_logic(monkeypatch, path: str):
         completed_at=None,
         started_at=expires_at,
         candidate_name="Jane",
-        access_token="access",
-        access_token_expires_at=expires_at,
         simulation=SimpleNamespace(id=10, title="Sim", role="Backend"),
     )
 

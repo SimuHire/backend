@@ -137,15 +137,6 @@ async def async_client(db_session: AsyncSession):
         if auth_header.lower().startswith("bearer "):
             token = auth_header.split(" ", 1)[1]
             kind, email = token.split(":", 1) if ":" in token else ("candidate", token)
-        else:
-            # Legacy helper for existing tests: derive identity from candidate headers.
-            cs_id = request.headers.get("x-candidate-session-id")
-            if cs_id:
-                from app.domains import CandidateSession
-
-                cs_obj = await db_session.get(CandidateSession, int(cs_id))
-                if cs_obj:
-                    email = cs_obj.candidate_email or cs_obj.invite_email
         if not email:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
@@ -274,7 +265,7 @@ def auth_header_factory():
 
 @pytest.fixture
 def candidate_header_factory():
-    """Helper to build candidate headers from a session/token."""
+    """Helper to build candidate headers from a session/email."""
 
     def _build(
         candidate_session_id: int | Base,
@@ -288,7 +279,11 @@ def candidate_header_factory():
             else candidate_session_id
         )
         if not token:
-            raise ValueError("Candidate access token required for candidate headers")
+            if email is None and hasattr(candidate_session_id, "invite_email"):
+                email = candidate_session_id.invite_email
+            if not email:
+                raise ValueError("Candidate email required for candidate headers")
+            token = f"candidate:{email}"
         headers = {
             "x-candidate-session-id": str(session_id),
             "Authorization": f"Bearer {token}",

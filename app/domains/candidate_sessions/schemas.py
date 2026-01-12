@@ -41,41 +41,6 @@ class CandidateSessionResolveResponse(APIModel):
     simulation: CandidateSimulationSummary
 
 
-class CandidateSessionVerifyRequest(APIModel):
-    """Schema for verifying invite email for a candidate session."""
-
-    email: EmailStr
-
-
-class CandidateSessionVerifyResponse(CandidateSessionResolveResponse):
-    """Backward-compatible alias for candidate session claim responses."""
-
-    pass
-
-
-class CandidateVerificationSendResponse(APIModel):
-    """Response for sending a verification code to the candidate."""
-
-    status: str
-    maskedEmail: str
-    expiresAt: datetime | None
-
-
-class CandidateVerificationConfirmRequest(APIModel):
-    """Request body for confirming a verification code."""
-
-    email: EmailStr
-    code: str
-
-
-class CandidateVerificationConfirmResponse(APIModel):
-    """Response after successful verification code confirmation."""
-
-    verified: bool
-    candidateAccessToken: str
-    expiresAt: datetime
-
-
 class ProgressSummary(APIModel):
     """Summary of progress for the candidate session."""
 

@@ -93,7 +93,7 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 ## Roadmap (not implemented yet)
 
 - Pre-provision repos at invite/simulation creation.
-- Invite email verification + notifications.
+- Invite email notifications.
 - AI scenario generation/evaluation + repo tailoring commits; generate `FitProfile` reports.
 - Day4 media upload pipeline; Day5 structured documentation.
 - Background jobs system.

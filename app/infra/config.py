@@ -61,9 +61,6 @@ class AuthSettings(BaseSettings):
     AUTH0_EMAIL_CLAIM: str = ""
     AUTH0_ROLES_CLAIM: str = ""
     AUTH0_PERMISSIONS_CLAIM: str = ""
-    CANDIDATE_TOKEN_SECRET: str = "dev-candidate-token-secret"
-    CANDIDATE_TOKEN_ALGORITHM: str = "HS256"
-    CANDIDATE_TOKEN_TTL_MINUTES: int = 60
 
     model_config = SettingsConfigDict(extra="ignore", env_prefix="TENON_")
 

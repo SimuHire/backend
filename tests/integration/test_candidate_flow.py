@@ -1,6 +1,5 @@
 import pytest
 
-from app.domains import CandidateSession
 from tests.factories import create_recruiter
 
 
@@ -39,19 +38,14 @@ async def test_full_flow_invite_through_first_submission(
     assert invite_res.status_code == 201, invite_res.text
     invite = invite_res.json()
 
-    send_res = await async_client.post(
-        f"/api/candidate/session/{invite['token']}/verification/code/send"
-    )
-    assert send_res.status_code == 200, send_res.text
-    cs = await async_session.get(CandidateSession, invite["candidateSessionId"])
-    verify_res = await async_client.post(
-        f"/api/candidate/session/{invite['token']}/verification/code/confirm",
-        json={"code": cs.verification_code, "email": "flow@example.com"},
-    )
-    assert verify_res.status_code == 200, verify_res.text
-    verify_body = verify_res.json()
     cs_id = invite["candidateSessionId"]
-    access_token = verify_body["candidateAccessToken"]
+    access_token = "candidate:flow@example.com"
+
+    claim_res = await async_client.get(
+        f"/api/candidate/session/{invite['token']}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert claim_res.status_code == 200, claim_res.text
 
     current_res = await async_client.get(
         f"/api/candidate/session/{cs_id}/current_task",

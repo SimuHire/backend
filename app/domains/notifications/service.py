@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,8 +9,6 @@ from app.domains import CandidateSession, Simulation
 from app.services.email import EmailSendResult, EmailService
 
 INVITE_EMAIL_RATE_LIMIT_SECONDS = 30
-VERIFICATION_EMAIL_RATE_LIMIT_SECONDS = 60
-VERIFICATION_CODE_TTL_MINUTES = 15
 
 
 def _utc_now(now: datetime | None) -> datetime:
@@ -71,33 +68,6 @@ def _invite_email_content(
     return subject, text, html
 
 
-def _verification_email_content(
-    *,
-    candidate_name: str,
-    invite_url: str,
-    code: str,
-    expires_at: datetime,
-) -> tuple[str, str, str]:
-    expires_text = expires_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    subject = f"Your {APP_NAME} verification code"
-    text = (
-        f"Hi {candidate_name},\n\n"
-        f"Use this code to verify your {APP_NAME} invite: {code}\n"
-        f"Verification code expires at {expires_text}.\n\n"
-        f"You can also open your invite directly: {invite_url}\n"
-        "If you did not request this, you can ignore this email."
-    )
-    html = (
-        f"<p>Hi {candidate_name},</p>"
-        f"<p>Use this code to verify your {APP_NAME} invite:</p>"
-        f"<h2>{code}</h2>"
-        f"<p>This code expires at {expires_text}.</p>"
-        f'<p><a href="{invite_url}">Open your invite</a></p>'
-        "<p>If you did not request this, you can ignore this email.</p>"
-    )
-    return subject, text, html
-
-
 async def send_invite_email(
     db: AsyncSession,
     *,
@@ -142,64 +112,6 @@ async def send_invite_email(
     else:
         candidate_session.invite_email_status = result.status
         candidate_session.invite_email_error = _sanitize_error(result.error)
-
-    await db.commit()
-    await db.refresh(candidate_session)
-    return result
-
-
-async def send_verification_email(
-    db: AsyncSession,
-    *,
-    candidate_session: CandidateSession,
-    invite_url: str,
-    email_service: EmailService,
-    now: datetime | None = None,
-) -> EmailSendResult:
-    """Generate and send a verification code email, respecting rate limits."""
-    now = _utc_now(now)
-    if _rate_limited(
-        candidate_session.verification_email_last_attempt_at,
-        now,
-        VERIFICATION_EMAIL_RATE_LIMIT_SECONDS,
-    ):
-        candidate_session.verification_email_status = "rate_limited"
-        candidate_session.verification_email_last_attempt_at = now
-        candidate_session.verification_email_error = "Rate limited"
-        await db.commit()
-        await db.refresh(candidate_session)
-        return EmailSendResult(status="rate_limited", error="Rate limited")
-
-    code = f"{secrets.randbelow(1_000_000):06d}"
-    expires_at = now + timedelta(minutes=VERIFICATION_CODE_TTL_MINUTES)
-    subject, text, html = _verification_email_content(
-        candidate_name=candidate_session.candidate_name,
-        invite_url=invite_url,
-        code=code,
-        expires_at=expires_at,
-    )
-    candidate_session.verification_code = code
-    candidate_session.verification_code_attempts = 0
-    candidate_session.verification_code_send_count = (
-        int(getattr(candidate_session, "verification_code_send_count", 0) or 0) + 1
-    )
-    candidate_session.verification_code_sent_at = now
-    candidate_session.verification_code_expires_at = expires_at
-
-    result = await email_service.send_email(
-        to=candidate_session.invite_email,
-        subject=subject,
-        text=text,
-        html=html,
-    )
-
-    candidate_session.verification_email_last_attempt_at = now
-    if result.status == "sent":
-        candidate_session.verification_email_status = "sent"
-        candidate_session.verification_email_error = None
-    else:
-        candidate_session.verification_email_status = result.status
-        candidate_session.verification_email_error = _sanitize_error(result.error)
 
     await db.commit()
     await db.refresh(candidate_session)

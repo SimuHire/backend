@@ -65,9 +65,24 @@ def _dedupe_candidate_sessions(conn) -> None:
                 UPDATE workspaces
                 SET candidate_session_id = :keep_id
                 WHERE candidate_session_id = :old_id
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM workspaces AS w2
+                    WHERE w2.candidate_session_id = :keep_id
+                      AND w2.task_id = workspaces.task_id
+                  )
                 """
             ),
             {"keep_id": keep_id, "old_id": old_id},
+        )
+        conn.execute(
+            sa.text(
+                """
+                DELETE FROM workspaces
+                WHERE candidate_session_id = :old_id
+                """
+            ),
+            {"old_id": old_id},
         )
         conn.execute(
             sa.text(

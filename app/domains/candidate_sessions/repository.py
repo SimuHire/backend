@@ -42,14 +42,14 @@ async def get_by_id(db: AsyncSession, session_id: int) -> CandidateSession | Non
     return res.scalar_one_or_none()
 
 
-async def get_by_access_token_hash(
-    db: AsyncSession, token_hash: str
+async def get_by_id_for_update(
+    db: AsyncSession, session_id: int
 ) -> CandidateSession | None:
-    """Lookup a candidate session by access token hash."""
+    """Return candidate session by id with a row lock."""
     res = await db.execute(
-        select(CandidateSession).where(
-            CandidateSession.candidate_access_token_hash == token_hash
-        )
+        select(CandidateSession)
+        .where(CandidateSession.id == session_id)
+        .with_for_update()
     )
     return res.scalar_one_or_none()
 

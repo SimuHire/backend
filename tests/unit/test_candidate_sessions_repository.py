@@ -16,17 +16,3 @@ async def test_get_by_token_for_update(async_session):
     found = await cs_repo.get_by_token_for_update(async_session, cs.token)
     assert found is not None
     assert found.id == cs.id
-
-
-@pytest.mark.asyncio
-async def test_get_by_access_token_hash(async_session):
-    recruiter = await create_recruiter(async_session, email="hash@test.com")
-    sim, _ = await create_simulation(async_session, created_by=recruiter)
-    cs = await create_candidate_session(
-        async_session, simulation=sim, access_token="token"
-    )
-    found = await cs_repo.get_by_access_token_hash(
-        async_session, cs.candidate_access_token_hash
-    )
-    assert found is not None
-    assert found.id == cs.id
