@@ -263,13 +263,13 @@ async def test_token_session_mismatch_rejected_404(
     current_b = await get_current_task(async_client, cs_id_b, token_b)
     task_id_b = current_b["currentTask"]["id"]
 
-    # email A + session B => forbidden
+    # email A + session B => rejected
     r = await async_client.post(
         f"/api/tasks/{task_id_b}/submit",
         headers=candidate_headers(cs_id_b, token_a),
         json={"contentText": "nope"},
     )
-    assert r.status_code == 403, r.text
+    assert r.status_code == 404, r.text
 
     # sanity: A can still submit its own task
     current_a = await get_current_task(async_client, cs_id_a, token_a)

@@ -33,6 +33,9 @@ class CandidateSession(Base):
     invite_email: Mapped[str] = mapped_column(String(255), nullable=False)
     candidate_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     candidate_auth0_sub: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    candidate_auth0_email: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     claimed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

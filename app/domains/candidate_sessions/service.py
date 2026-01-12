@@ -51,55 +51,57 @@ def _normalize_email(value: str) -> str:
     return value.strip().lower()
 
 
-def _ensure_email_match(candidate_session: CandidateSession, email: str) -> None:
-    """Enforce that the Auth0 email matches the invite/candidate record."""
-    normalized_email = _normalize_email(email)
-    if not normalized_email:
+def _ensure_email_verified(principal: Principal) -> None:
+    verified = principal.claims.get("email_verified")
+    if verified is False:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification required",
+        )
+
+
+def _ensure_candidate_ownership(
+    candidate_session: CandidateSession, principal: Principal, *, now: datetime
+) -> bool:
+    """Ensure candidate owns the session, claiming it if unassigned."""
+    stored_sub = getattr(candidate_session, "candidate_auth0_sub", None)
+    if stored_sub:
+        if stored_sub != principal.sub:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Candidate session not found",
+            )
+        changed = False
+        email = _normalize_email(principal.email)
+        if email and getattr(candidate_session, "candidate_auth0_email", None) is None:
+            candidate_session.candidate_auth0_email = email
+            changed = True
+        if email and candidate_session.candidate_email != email:
+            candidate_session.candidate_email = email
+            changed = True
+        return changed
+
+    _ensure_email_verified(principal)
+    email = _normalize_email(principal.email)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Email claim missing",
         )
 
     invite_email = _normalize_email(candidate_session.invite_email)
-    claimed_email = _normalize_email(
-        getattr(candidate_session, "candidate_email", None)
-    )
-    expected_email = claimed_email or invite_email
-    if expected_email != normalized_email:
+    if invite_email != email:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sign in with invited email",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate session not found",
         )
 
-
-def _ensure_sub_match(
-    candidate_session: CandidateSession, principal: Principal
-) -> None:
-    """Block access when a different Auth0 subject attempts to reuse an invite."""
-    stored_sub = getattr(candidate_session, "candidate_auth0_sub", None)
-    if stored_sub and stored_sub != principal.sub:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized for this invite",
-        )
-
-
-def _attach_identity(
-    candidate_session: CandidateSession, principal: Principal, *, now: datetime
-) -> bool:
-    """Persist Auth0 identity on the candidate session (idempotent)."""
-    changed = False
-    email = _normalize_email(principal.email)
-    if candidate_session.candidate_email != email:
-        candidate_session.candidate_email = email
-        changed = True
-    if getattr(candidate_session, "candidate_auth0_sub", None) is None:
-        candidate_session.candidate_auth0_sub = principal.sub
-        changed = True
+    candidate_session.candidate_auth0_sub = principal.sub
+    candidate_session.candidate_auth0_email = email
+    candidate_session.candidate_email = email
     if getattr(candidate_session, "claimed_at", None) is None:
         candidate_session.claimed_at = now
-        changed = True
-    return changed
+    return True
 
 
 async def claim_invite_with_principal(
@@ -107,11 +109,10 @@ async def claim_invite_with_principal(
 ) -> CandidateSession:
     """Attach Auth0 identity to an invite token and transition to in_progress."""
     now = now or datetime.now(UTC)
-    cs = await fetch_by_token(db, token, now=now)
-    _ensure_email_match(cs, principal.email)
-    _ensure_sub_match(cs, principal)
-    _mark_in_progress(cs, now=now)
-    changed = _attach_identity(cs, principal, now=now)
+    async with db.begin_nested():
+        cs = await fetch_by_token_for_update(db, token, now=now)
+        _mark_in_progress(cs, now=now)
+        changed = _ensure_candidate_ownership(cs, principal, now=now)
     if changed:
         await db.commit()
         await db.refresh(cs)
@@ -177,16 +178,14 @@ async def fetch_owned_session(
 ) -> CandidateSession:
     """Load a candidate session and enforce Auth0 ownership."""
     now = now or datetime.now(UTC)
-    cs = await cs_repo.get_by_id(db, session_id)
+    cs = await cs_repo.get_by_id_for_update(db, session_id)
     if cs is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Candidate session not found"
         )
 
     _ensure_not_expired(cs, now=now)
-    _ensure_email_match(cs, principal.email)
-    _ensure_sub_match(cs, principal)
-    changed = _attach_identity(cs, principal, now=now)
+    changed = _ensure_candidate_ownership(cs, principal, now=now)
     if cs.status == "not_started":
         _mark_in_progress(cs, now=now)
         changed = True

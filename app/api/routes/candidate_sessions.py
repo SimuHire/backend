@@ -51,11 +51,6 @@ async def resolve_candidate_session(
     response_model=CandidateSessionResolveResponse,
     status_code=status.HTTP_200_OK,
 )
-@router.post(
-    "/session/{token}/verify",
-    response_model=CandidateSessionResolveResponse,
-    status_code=status.HTTP_200_OK,
-)
 async def claim_candidate_session(
     token: Annotated[str, Path(..., min_length=20, max_length=255)],
     db: Annotated[AsyncSession, Depends(get_session)],

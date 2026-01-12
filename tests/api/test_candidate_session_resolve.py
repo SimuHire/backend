@@ -343,5 +343,4 @@ async def test_bootstrap_wrong_email_forbidden(async_client, async_session):
         f"/api/candidate/session/{invite['token']}",
         headers={"Authorization": f"Bearer {access_token}"},
     )
-    assert res.status_code == 403
-    assert res.json()["detail"] == "Sign in with invited email"
+    assert res.status_code == 404

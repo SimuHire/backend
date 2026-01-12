@@ -42,6 +42,18 @@ async def get_by_id(db: AsyncSession, session_id: int) -> CandidateSession | Non
     return res.scalar_one_or_none()
 
 
+async def get_by_id_for_update(
+    db: AsyncSession, session_id: int
+) -> CandidateSession | None:
+    """Return candidate session by id with a row lock."""
+    res = await db.execute(
+        select(CandidateSession)
+        .where(CandidateSession.id == session_id)
+        .with_for_update()
+    )
+    return res.scalar_one_or_none()
+
+
 async def tasks_for_simulation(db: AsyncSession, simulation_id: int) -> list[Task]:
     """Return tasks ordered by day_index for a simulation."""
     tasks_stmt = (

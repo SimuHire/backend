@@ -113,7 +113,7 @@ async def test_candidate_email_bypass_rejected(async_client, async_session):
             "x-candidate-session-id": str(cs.id),
         },
     )
-    assert res.status_code == 403
+    assert res.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -186,7 +186,7 @@ async def test_candidate_mismatched_email_gets_403(async_client, async_session):
         f"/api/candidate/session/{cs.token}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert res.status_code == 403
+    assert res.status_code == 404
 
 
 @pytest.mark.asyncio

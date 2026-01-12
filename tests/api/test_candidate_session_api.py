@@ -116,8 +116,7 @@ async def test_claim_endpoint_forbidden_on_mismatch(async_client, async_session)
         f"/api/candidate/session/{cs.token}",
         headers={"Authorization": "Bearer candidate:other@example.com"},
     )
-    assert res.status_code == 403
-    assert res.json()["detail"] == "Sign in with invited email"
+    assert res.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -192,7 +191,7 @@ async def test_current_task_token_mismatch(async_client, async_session):
             "x-candidate-session-id": str(cs.id),
         },
     )
-    assert res.status_code == 403
+    assert res.status_code == 404
 
 
 @pytest.mark.asyncio
