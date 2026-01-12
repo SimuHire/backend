@@ -50,7 +50,7 @@ def test_decode_auth0_token_invalid_signature(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def bad_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def bad_decode(token, key, algorithms, audience, issuer, options):
         raise JWTError("invalid")
 
     monkeypatch.setattr(jwt, "decode", bad_decode)
@@ -90,9 +90,11 @@ def test_decode_auth0_token_success(monkeypatch):
         return {"keys": [{"kid": "kid1"}]}
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
-    def ok_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+
+    def ok_decode(token, key, algorithms, audience, issuer, options):
         assert isinstance(algorithms, list)
         assert "RS256" in algorithms
+        assert options["leeway"] == auth0.settings.auth.AUTH0_LEEWAY_SECONDS
         return {"email": "ok@example.com"}
 
     monkeypatch.setattr(jwt, "decode", ok_decode)
@@ -112,7 +114,7 @@ def test_decode_auth0_token_invalid_issuer(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def bad_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def bad_decode(token, key, algorithms, audience, issuer, options):
         assert issuer == auth0.settings.auth.issuer
         raise JWTError("invalid issuer")
 
@@ -133,7 +135,7 @@ def test_decode_auth0_token_invalid_audience(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def bad_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def bad_decode(token, key, algorithms, audience, issuer, options):
         assert audience == auth0.settings.auth.audience
         raise JWTError("invalid audience")
 
@@ -164,7 +166,7 @@ def test_decode_auth0_token_expired(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def bad_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def bad_decode(token, key, algorithms, audience, issuer, options):
         raise ExpiredSignatureError("expired")
 
     monkeypatch.setattr(jwt, "decode", bad_decode)
@@ -199,13 +201,11 @@ def test_decode_auth0_token_refreshes_jwks_on_kid_miss(monkeypatch):
         return responses.pop(0)
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
-    monkeypatch.setattr(
-        jwt,
-        "decode",
-        lambda token, key, algorithms, audience, issuer, options, leeway=0: {
-            "email": "ok@example.com"
-        },
-    )
+
+    def ok_decode(token, key, algorithms, audience, issuer, options):
+        return {"email": "ok@example.com"}
+
+    monkeypatch.setattr(jwt, "decode", ok_decode)
 
     claims = auth0.decode_auth0_token("tok")
     assert claims["email"] == "ok@example.com"
@@ -222,14 +222,14 @@ def test_decode_auth0_token_accepts_audience_list(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def ok_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def ok_decode(token, key, algorithms, audience, issuer, options):
         assert audience == auth0.settings.auth.audience
         return {"email": "ok@example.com", "aud": [audience, "other"]}
 
     monkeypatch.setattr(jwt, "decode", ok_decode)
 
     claims = auth0.decode_auth0_token("tok")
-    assert "ok@example.com" == claims["email"]
+    assert claims["email"] == "ok@example.com"
 
 
 def test_issuer_normalization_used_for_decode(monkeypatch):
@@ -244,8 +244,28 @@ def test_issuer_normalization_used_for_decode(monkeypatch):
 
     monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
 
-    def ok_decode(token, key, algorithms, audience, issuer, options, leeway=0):
+    def ok_decode(token, key, algorithms, audience, issuer, options):
         assert issuer == "https://issuer.test/"
+        return {"email": "ok@example.com"}
+
+    monkeypatch.setattr(jwt, "decode", ok_decode)
+
+    claims = auth0.decode_auth0_token("tok")
+    assert claims["email"] == "ok@example.com"
+
+
+def test_decode_auth0_token_does_not_pass_leeway_kwarg(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "kid1", "alg": "RS256"}
+    )
+
+    def fake_fetch():
+        return {"keys": [{"kid": "kid1"}]}
+
+    monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
+
+    def ok_decode(token, key, algorithms, audience, issuer, options):
         return {"email": "ok@example.com"}
 
     monkeypatch.setattr(jwt, "decode", ok_decode)

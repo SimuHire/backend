@@ -160,7 +160,11 @@ async def get_principal(
     except HTTPException as exc:
         logger.warning(
             "auth0_claims_invalid",
-            extra={"request_id": request_id, "detail": exc.detail, "reason": "claims_invalid"},
+            extra={
+                "request_id": request_id,
+                "detail": exc.detail,
+                "reason": "claims_invalid",
+            },
         )
         raise
 

@@ -4,8 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from starlette.requests import Request
 
 from app.infra.config import settings
-from app.infra.security import auth0
-from app.infra.security import principal
+from app.infra.security import auth0, principal
 
 
 def test_extract_principal_missing_email_claim():
@@ -85,9 +84,7 @@ async def test_get_principal_auth0_error_does_not_crash(monkeypatch):
 
     monkeypatch.setattr(auth0, "decode_auth0_token", bad_decode)
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
-    request = Request(
-        {"type": "http", "headers": [(b"x-request-id", b"req-1")]}
-    )
+    request = Request({"type": "http", "headers": [(b"x-request-id", b"req-1")]})
 
     with pytest.raises(auth0.Auth0Error):
         await principal.get_principal(credentials, request)

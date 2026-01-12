@@ -135,8 +135,10 @@ def decode_auth0_token(token: str) -> dict[str, Any]:
             algorithms=settings.auth.algorithms,
             audience=settings.auth.audience,
             issuer=settings.auth.issuer,
-            options={"verify_at_hash": False},
-            leeway=settings.auth.AUTH0_LEEWAY_SECONDS,
+            options={
+                "verify_at_hash": False,
+                "leeway": settings.auth.AUTH0_LEEWAY_SECONDS,
+            },
         )
     except ExpiredSignatureError as exc:
         _log_failure("expired", kid=kid, alg=alg)
