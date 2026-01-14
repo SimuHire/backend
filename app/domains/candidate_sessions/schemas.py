@@ -25,12 +25,16 @@ class CandidateInviteResponse(APIModel):
 
 
 class CandidateInviteError(APIModel):
+    """Schema for rejected invite errors."""
+
     code: str
     message: str
     outcome: Literal["rejected"]
 
 
 class CandidateInviteErrorResponse(APIModel):
+    """Schema for invite error responses."""
+
     error: CandidateInviteError
 
 

@@ -26,6 +26,8 @@ INVITE_TOKEN_TTL_DAYS = 14
 
 
 class InviteRejectedError(Exception):
+    """Raised when an invite cannot be issued because the session is completed."""
+
     def __init__(
         self,
         *,
