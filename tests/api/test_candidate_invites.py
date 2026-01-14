@@ -247,7 +247,7 @@ async def test_invite_completed_rejected(
 
 
 @pytest.mark.asyncio
-async def test_invite_concurrent_requests_idempotent(
+async def test_invite_duplicate_requests_idempotent(
     async_client, async_session: AsyncSession, monkeypatch
 ):
     monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
