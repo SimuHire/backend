@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import ipaddress
 import math
 import time
 from contextlib import asynccontextmanager
@@ -30,13 +29,8 @@ def rate_limit_enabled() -> bool:
 
 
 def client_id(request: Request) -> str:
-    """Return a stable client identifier based on trusted proxy headers."""
-    client_host = _client_host(request)
-    if client_host and _is_trusted_proxy(client_host):
-        forwarded = _first_forwarded_for(request.headers.get("x-forwarded-for") or "")
-        if forwarded:
-            return forwarded
-    return client_host or "unknown"
+    """Return a stable client identifier."""
+    return _client_host(request) or "unknown"
 
 
 def _client_host(request: Request) -> str | None:
@@ -44,42 +38,6 @@ def _client_host(request: Request) -> str | None:
     if client and getattr(client, "host", None):
         return str(client.host)
     return None
-
-
-def _first_forwarded_for(value: str) -> str | None:
-    if not value:
-        return None
-    candidate = value.split(",", 1)[0].strip()
-    if not candidate:
-        return None
-    if _is_valid_ip(candidate):
-        return candidate
-    return None
-
-
-def _is_trusted_proxy(host: str) -> bool:
-    cidrs = settings.TRUSTED_PROXY_CIDRS or []
-    if not cidrs:
-        return False
-    try:
-        addr = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    for cidr in cidrs:
-        try:
-            if addr in ipaddress.ip_network(cidr):
-                return True
-        except ValueError:
-            continue
-    return False
-
-
-def _is_valid_ip(value: str) -> bool:
-    try:
-        ipaddress.ip_address(value)
-    except ValueError:
-        return False
-    return True
 
 
 def hash_value(value: str) -> str:

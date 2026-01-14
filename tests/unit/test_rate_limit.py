@@ -4,27 +4,24 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.infra.config import settings
 from app.infra.security import rate_limit
 
 
-def _request(host: str, headers: dict[str, str] | None = None):
+def _request(host: str | None, headers: dict[str, str] | None = None):
     return SimpleNamespace(
         headers=headers or {},
-        client=SimpleNamespace(host=host),
+        client=SimpleNamespace(host=host) if host else None,
     )
 
 
-def test_client_id_ignores_xff_when_untrusted(monkeypatch):
-    monkeypatch.setattr(settings, "TRUSTED_PROXY_CIDRS", [])
+def test_client_id_uses_client_host_only():
     req = _request("10.1.2.3", {"x-forwarded-for": "203.0.113.5"})
     assert rate_limit.client_id(req) == "10.1.2.3"
 
 
-def test_client_id_uses_xff_when_trusted(monkeypatch):
-    monkeypatch.setattr(settings, "TRUSTED_PROXY_CIDRS", ["10.0.0.0/8"])
-    req = _request("10.1.2.3", {"x-forwarded-for": "203.0.113.5"})
-    assert rate_limit.client_id(req) == "203.0.113.5"
+def test_client_id_defaults_when_no_client():
+    req = _request(None)
+    assert rate_limit.client_id(req) == "unknown"
 
 
 def test_throttle_includes_retry_after_header():
