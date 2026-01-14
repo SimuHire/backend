@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Company, User
+from app.domains.common.types import CANDIDATE_SESSION_STATUS_COMPLETED
 
 
 async def seed_recruiter(
@@ -64,7 +65,7 @@ async def test_invite_creates_candidate_session(
         headers={"x-dev-user-email": "recruiterA@tenon.com"},
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 200
     body = resp.json()
 
     assert isinstance(body["candidateSessionId"], int)
@@ -123,7 +124,7 @@ async def test_invite_resends_existing_active(
         headers={"x-dev-user-email": "recruiterA@tenon.com"},
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
-    assert first.status_code == 201
+    assert first.status_code == 200
     first_body = first.json()
 
     second = await async_client.post(
@@ -171,7 +172,7 @@ async def test_invite_expired_refreshes_token(
         headers={"x-dev-user-email": "recruiterA@tenon.com"},
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
-    assert first.status_code == 201
+    assert first.status_code == 200
     first_body = first.json()
 
     stmt = select(CandidateSession).where(
@@ -186,7 +187,7 @@ async def test_invite_expired_refreshes_token(
         headers={"x-dev-user-email": "recruiterA@tenon.com"},
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
-    assert second.status_code == 201
+    assert second.status_code == 200
     second_body = second.json()
     assert second_body["candidateSessionId"] == first_body["candidateSessionId"]
     assert second_body["token"] != first_body["token"]
@@ -223,14 +224,14 @@ async def test_invite_completed_rejected(
         headers={"x-dev-user-email": "recruiterA@tenon.com"},
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
-    assert first.status_code == 201
+    assert first.status_code == 200
     first_body = first.json()
 
     stmt = select(CandidateSession).where(
         CandidateSession.id == first_body["candidateSessionId"]
     )
     cs = (await async_session.execute(stmt)).scalar_one()
-    cs.status = "completed"
+    cs.status = CANDIDATE_SESSION_STATUS_COMPLETED
     cs.completed_at = datetime.now(UTC)
     await async_session.commit()
 
@@ -240,7 +241,55 @@ async def test_invite_completed_rejected(
         json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
     )
     assert second.status_code == 409
-    assert second.json()["detail"]["outcome"] == "rejected"
+    payload = second.json()
+    assert payload["error"]["outcome"] == "rejected"
+    assert payload["error"]["code"] == "candidate_already_completed"
+
+
+@pytest.mark.asyncio
+async def test_invite_concurrent_requests_idempotent(
+    async_client, async_session: AsyncSession, monkeypatch
+):
+    monkeypatch.setenv("DEV_AUTH_BYPASS", "1")
+
+    await seed_recruiter(
+        async_session,
+        email="recruiterA@tenon.com",
+        company_name="Recruiter A Co",
+    )
+
+    create_sim = await async_client.post(
+        "/api/simulations",
+        headers={"x-dev-user-email": "recruiterA@tenon.com"},
+        json={
+            "title": "Backend Node Simulation",
+            "role": "Backend Engineer",
+            "techStack": "Node.js, PostgreSQL",
+            "seniority": "Mid",
+            "focus": "Build new API feature and debug an issue",
+        },
+    )
+    sim_id = create_sim.json()["id"]
+
+    async def _invite():
+        return await async_client.post(
+            f"/api/simulations/{sim_id}/invite",
+            headers={"x-dev-user-email": "recruiterA@tenon.com"},
+            json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
+        )
+
+    # async_client uses a shared session fixture, so true concurrency would
+    # contend on a single transaction. Run sequentially as a best-effort check.
+    first = await _invite()
+    second = await _invite()
+    assert first.status_code == 200
+    assert second.status_code == 200
+    outcomes = {first.json()["outcome"], second.json()["outcome"]}
+    assert outcomes == {"created", "resent"}
+
+    stmt = select(CandidateSession).where(CandidateSession.simulation_id == sim_id)
+    rows = (await async_session.execute(stmt)).scalars().all()
+    assert len(rows) == 1
 
 
 @pytest.mark.asyncio

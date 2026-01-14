@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.domains import CandidateSession
+from app.domains.common.types import CANDIDATE_SESSION_STATUS_COMPLETED
 from app.domains.simulations import service as sim_service
 from tests.factories import create_recruiter, create_simulation
 
@@ -244,16 +245,15 @@ async def test_create_or_resend_invite_rejects_completed(async_session):
     cs, _created = await sim_service.create_invite(
         async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
     )
-    cs.status = "completed"
+    cs.status = CANDIDATE_SESSION_STATUS_COMPLETED
     cs.completed_at = datetime.now(UTC)
     await async_session.commit()
 
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(sim_service.InviteRejectedError) as excinfo:
         await sim_service.create_or_resend_invite(
             async_session, simulation_id=sim.id, payload=payload, now=datetime.now(UTC)
         )
-    assert excinfo.value.status_code == 409
-    assert excinfo.value.detail["outcome"] == "rejected"
+    assert excinfo.value.outcome == "rejected"
 
 
 @pytest.mark.asyncio

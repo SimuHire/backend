@@ -3,13 +3,15 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.github_native import get_github_client
 from app.api.dependencies.notifications import get_email_service
 from app.domains import CandidateSession
 from app.domains.candidate_sessions.schemas import (
+    CandidateInviteErrorResponse,
     CandidateInviteRequest,
     CandidateInviteResponse,
     CandidateSessionListItem,
@@ -136,7 +138,8 @@ async def get_simulation_detail(
 @router.post(
     "/{simulation_id}/invite",
     response_model=CandidateInviteResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
+    responses={status.HTTP_409_CONFLICT: {"model": CandidateInviteErrorResponse}},
 )
 async def create_candidate_invite(
     simulation_id: int,
@@ -145,7 +148,6 @@ async def create_candidate_invite(
     user: Annotated[Any, Depends(get_current_user)],
     email_service: Annotated[EmailService, Depends(get_email_service)],
     github_client: Annotated[GithubClient, Depends(get_github_client)],
-    response: Response,
 ):
     """Create a candidate_session invite token for a simulation (recruiter-only)."""
     ensure_recruiter_or_none(user)
@@ -164,9 +166,21 @@ async def create_candidate_invite(
         for task in tasks
     ]
     now = datetime.now(UTC)
-    cs, outcome = await sim_service.create_or_resend_invite(
-        db, simulation_id, payload, now=now
-    )
+    try:
+        cs, outcome = await sim_service.create_or_resend_invite(
+            db, simulation_id, payload, now=now
+        )
+    except sim_service.InviteRejectedError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": exc.message,
+                    "outcome": exc.outcome,
+                }
+            },
+        )
 
     repo_prefix = settings.github.GITHUB_REPO_PREFIX
     template_owner = settings.github.GITHUB_TEMPLATE_OWNER or settings.github.GITHUB_ORG
@@ -217,8 +231,6 @@ async def create_candidate_invite(
         email_service=email_service,
         now=now,
     )
-    if outcome == "resent":
-        response.status_code = status.HTTP_200_OK
     return CandidateInviteResponse(
         candidateSessionId=cs.id,
         token=cs.token,

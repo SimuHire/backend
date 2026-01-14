@@ -24,6 +24,16 @@ class CandidateInviteResponse(APIModel):
     outcome: Literal["created", "resent"]
 
 
+class CandidateInviteError(APIModel):
+    code: str
+    message: str
+    outcome: Literal["rejected"]
+
+
+class CandidateInviteErrorResponse(APIModel):
+    error: CandidateInviteError
+
+
 class CandidateSimulationSummary(APIModel):
     """Summary of the simulation for candidate session response."""
 

@@ -5,8 +5,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from fastapi import Response
-
 from app.api.routes import simulations as recruiter_sims
 
 
@@ -70,7 +68,6 @@ async def test_create_candidate_invite_happy_path(monkeypatch):
         user=user,
         email_service=email_service,
         github_client=SimpleNamespace(),
-        response=Response(),
     )
     assert resp.inviteUrl.endswith("/tok")
     assert resp.candidateSessionId == cs.id

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains import CandidateSession, FitProfile, Simulation, Task
 from app.domains.candidate_sessions import repository as cs_repo
 from app.domains.candidate_sessions.schemas import CandidateInviteRequest
+from app.domains.common.types import CANDIDATE_SESSION_STATUS_COMPLETED
 from app.domains.simulations import repository as sim_repo
 from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
 from app.domains.tasks.template_catalog import (
@@ -22,6 +23,20 @@ from app.domains.tasks.template_catalog import (
 from app.infra.config import settings
 
 INVITE_TOKEN_TTL_DAYS = 14
+
+
+class InviteRejectedError(Exception):
+    def __init__(
+        self,
+        *,
+        code: str = "candidate_already_completed",
+        message: str = "Candidate already completed simulation",
+        outcome: str = "rejected",
+    ) -> None:
+        self.code = code
+        self.message = message
+        self.outcome = outcome
+        super().__init__(message)
 
 
 async def require_owned_simulation(
@@ -128,7 +143,8 @@ async def create_invite(
 ) -> tuple[CandidateSession, bool]:
     """Create a candidate session with random token, handling rare collisions."""
     now = now or datetime.now(UTC)
-    invite_email = str(payload.inviteEmail).lower()
+    # Stored emails are normalized to align with unique constraint enforcement.
+    invite_email = str(payload.inviteEmail).strip().lower()
     expires_at = now + timedelta(days=INVITE_TOKEN_TTL_DAYS)
     for _ in range(3):
         token = secrets.token_urlsafe(32)  # typically ~43 chars, url-safe
@@ -174,13 +190,14 @@ async def _refresh_invite_token(
 ) -> CandidateSession:
     expires_at = now + timedelta(days=INVITE_TOKEN_TTL_DAYS)
     for _ in range(3):
-        candidate_session.token = secrets.token_urlsafe(32)
-        candidate_session.expires_at = expires_at
         try:
-            await db.flush()
+            async with db.begin_nested():
+                candidate_session.token = secrets.token_urlsafe(32)
+                candidate_session.expires_at = expires_at
+                await db.flush()
             return candidate_session
         except IntegrityError:
-            await db.rollback()
+            continue
 
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,20 +214,14 @@ async def create_or_resend_invite(
 ) -> tuple[CandidateSession, str]:
     """Create, refresh, or resend a candidate invite based on existing state."""
     now = now or datetime.now(UTC)
-    invite_email = str(payload.inviteEmail).lower()
+    invite_email = str(payload.inviteEmail).strip().lower()
 
     existing = await cs_repo.get_by_simulation_and_email_for_update(
         db, simulation_id=simulation_id, invite_email=invite_email
     )
     if existing:
-        if existing.status == "completed":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "message": "Candidate already completed simulation",
-                    "outcome": "rejected",
-                },
-            )
+        if existing.status == CANDIDATE_SESSION_STATUS_COMPLETED:
+            raise InviteRejectedError()
         if _invite_is_expired(existing, now=now):
             refreshed = await _refresh_invite_token(db, existing, now=now)
             await db.commit()
@@ -223,14 +234,8 @@ async def create_or_resend_invite(
     )
     if was_created:
         return created, "created"
-    if created.status == "completed":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Candidate already completed simulation",
-                "outcome": "rejected",
-            },
-        )
+    if created.status == CANDIDATE_SESSION_STATUS_COMPLETED:
+        raise InviteRejectedError()
     if _invite_is_expired(created, now=now):
         refreshed = await _refresh_invite_token(db, created, now=now)
         await db.commit()

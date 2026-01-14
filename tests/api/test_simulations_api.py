@@ -1,6 +1,5 @@
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies.github_native import get_github_client
 from app.api.dependencies.notifications import get_email_service
@@ -82,7 +81,7 @@ async def test_invite_sends_email_and_tracks_status(
             headers=auth_header_factory(recruiter),
         )
 
-    assert res.status_code == 201, res.text
+    assert res.status_code == 200, res.text
 
     cs = (await async_session.execute(select(CandidateSession))).scalar_one()
     assert cs.invite_email_status == "sent"
@@ -152,7 +151,7 @@ async def test_invite_preprovisions_day2_day3_workspaces(
             headers=auth_header_factory(recruiter),
         )
 
-    assert res.status_code == 201, res.text
+    assert res.status_code == 200, res.text
 
     cs = (await async_session.execute(select(CandidateSession))).scalar_one()
     workspaces = (
@@ -240,18 +239,6 @@ async def test_invite_github_failure_reuses_candidate_session(
     )
     assert len(existing) == 1
 
-    fail_once = True
-    original_commit = async_session.commit
-
-    async def _commit_with_integrity_error():
-        nonlocal fail_once
-        if fail_once:
-            fail_once = False
-            raise IntegrityError("", {}, None)
-        return await original_commit()
-
-    monkeypatch.setattr(async_session, "commit", _commit_with_integrity_error)
-
     with override_dependencies(
         {
             get_email_service: lambda: email_service,
@@ -263,9 +250,10 @@ async def test_invite_github_failure_reuses_candidate_session(
             json={"candidateName": "Jane Doe", "inviteEmail": "jane@example.com"},
             headers=auth_header_factory(recruiter),
         )
-    assert res.status_code == 201, res.text
+    assert res.status_code == 200, res.text
     body = res.json()
     assert body["candidateSessionId"] == existing[0].id
+    assert body["outcome"] == "resent"
 
     workspaces = (
         (

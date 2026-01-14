@@ -58,7 +58,7 @@ async def _invite_candidate(
         json=payload,
         headers={"x-dev-user-email": recruiter_email},
     )
-    assert res.status_code == 201, res.text
+    assert res.status_code == 200, res.text
     return res.json()
 
 

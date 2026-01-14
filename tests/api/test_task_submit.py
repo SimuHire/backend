@@ -61,7 +61,7 @@ async def invite_candidate(
         headers={"x-dev-user-email": recruiter_email},
         json={"candidateName": "Jane Doe", "inviteEmail": invite_email},
     )
-    assert resp.status_code == 201, resp.text
+    assert resp.status_code == 200, resp.text
     return resp.json()
 
 

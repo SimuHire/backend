@@ -35,7 +35,7 @@ async def test_full_flow_invite_through_first_submission(
         headers=auth_header_factory(recruiter),
         json={"candidateName": "Flow Candidate", "inviteEmail": "flow@example.com"},
     )
-    assert invite_res.status_code == 201, invite_res.text
+    assert invite_res.status_code == 200, invite_res.text
     invite = invite_res.json()
 
     cs_id = invite["candidateSessionId"]
