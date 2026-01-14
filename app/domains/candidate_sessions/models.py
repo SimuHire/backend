@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, text, UniqueConstraint
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    column,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db.base import Base
@@ -21,7 +30,7 @@ class CandidateSession(Base):
         Index(
             "uq_candidate_sessions_simulation_invite_email_ci",
             "simulation_id",
-            text("lower(invite_email)"),
+            func.lower(column("invite_email")),
             unique=True,
         ),
     )
