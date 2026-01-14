@@ -63,6 +63,13 @@ async def _compute_current_task(db: AsyncSession, cs: CandidateSession) -> Task 
     return current
 
 
+def _is_canonical_codespace_url(url: str | None) -> bool:
+    """Return True if the URL matches the canonical Codespaces deep link."""
+    if not url:
+        return False
+    return url.startswith("https://codespaces.new/") and "quickstart=1" in url
+
+
 @router.post(
     "/{task_id}/codespace/init",
     response_model=CodespaceInitResponse,
@@ -113,9 +120,20 @@ async def init_codespace(
             detail="GitHub unavailable. Please try again.",
         ) from exc
 
-    codespace_url = workspace.codespace_url or submission_service.build_codespace_url(
-        workspace.repo_full_name
-    )
+    if not workspace.repo_full_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace repo not provisioned yet. Please try again.",
+        )
+
+    canonical_url = submission_service.build_codespace_url(workspace.repo_full_name)
+    codespace_url = workspace.codespace_url
+    if not _is_canonical_codespace_url(codespace_url):
+        if codespace_url != canonical_url:
+            workspace.codespace_url = canonical_url
+            await db.commit()
+            await db.refresh(workspace)
+        codespace_url = canonical_url
     return CodespaceInitResponse(
         repoFullName=workspace.repo_full_name,
         repoUrl=f"https://github.com/{workspace.repo_full_name}",
@@ -157,12 +175,20 @@ async def codespace_status(
         except ValueError:
             last_test_summary = None
 
+    if not workspace.repo_full_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace repo not provisioned yet. Please try again.",
+        )
+
+    canonical_url = submission_service.build_codespace_url(workspace.repo_full_name)
     codespace_url = workspace.codespace_url
-    if not codespace_url:
-        codespace_url = submission_service.build_codespace_url(workspace.repo_full_name)
-        workspace.codespace_url = codespace_url
-        await db.commit()
-        await db.refresh(workspace)
+    if not _is_canonical_codespace_url(codespace_url):
+        if codespace_url != canonical_url:
+            workspace.codespace_url = canonical_url
+            await db.commit()
+            await db.refresh(workspace)
+        codespace_url = canonical_url
 
     return CodespaceStatusResponse(
         repoFullName=workspace.repo_full_name,

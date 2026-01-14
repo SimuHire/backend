@@ -83,6 +83,7 @@ async def test_init_codespace_success_path(monkeypatch, async_session):
     cs = _stub_cs()
     task = _stub_task()
     workspace = _stub_workspace()
+    workspace.codespace_url = "https://codespaces.new/org/repo?quickstart=1"
 
     async def _return_task(*_a, **_k):
         return task
@@ -131,6 +132,67 @@ async def test_init_codespace_success_path(monkeypatch, async_session):
     )
     assert result.repoFullName == workspace.repo_full_name
     assert result.workspaceId == workspace.id
+
+
+@pytest.mark.asyncio
+async def test_init_codespace_normalizes_legacy_url(monkeypatch, async_session):
+    cs = _stub_cs()
+    task = _stub_task()
+    workspace = _stub_workspace()
+    workspace.codespace_url = "https://github.com/codespaces/new?repo=org/repo"
+
+    async def _return_task(*_a, **_k):
+        return task
+
+    async def _return_workspace(*_a, **_k):
+        return workspace
+
+    async def _noop(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "load_task_or_404",
+        _return_task,
+    )
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "ensure_task_belongs",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "ensure_in_order",
+        lambda *a, **k: None,
+    )
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "validate_run_allowed",
+        lambda *a, **k: None,
+    )
+
+    async def _return_current(*_a, **_k):
+        return task
+
+    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "ensure_workspace",
+        _return_workspace,
+    )
+    monkeypatch.setattr(async_session, "commit", _noop)
+    monkeypatch.setattr(async_session, "refresh", _noop)
+
+    payload = CodespaceInitRequest(githubUsername="octocat")
+    result = await candidate_submissions.init_codespace(
+        task_id=task.id,
+        payload=payload,
+        candidate_session=cs,
+        db=async_session,
+        github_client=object(),
+    )
+    assert result.codespaceUrl == "https://codespaces.new/org/repo?quickstart=1"
+    assert workspace.codespace_url == "https://codespaces.new/org/repo?quickstart=1"
 
 
 @pytest.mark.asyncio
@@ -221,6 +283,77 @@ async def test_codespace_status_invalid_summary(monkeypatch, async_session):
     assert resp.lastTestSummary is None
     assert resp.repoFullName == workspace.repo_full_name
     assert resp.codespaceUrl == "https://codespaces.new/org/repo?quickstart=1"
+
+
+@pytest.mark.asyncio
+async def test_codespace_status_normalizes_legacy_url(monkeypatch, async_session):
+    cs = _stub_cs()
+    task = _stub_task()
+    workspace = _stub_workspace()
+    workspace.codespace_url = "https://github.com/codespaces/new?repo=org/repo"
+
+    async def _return_task(*_a, **_k):
+        return task
+
+    async def _return_workspace_obj(*_a, **_kw):
+        return workspace
+
+    async def _noop(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "load_task_or_404",
+        _return_task,
+    )
+    monkeypatch.setattr(
+        candidate_submissions.workspace_repo,
+        "get_by_session_and_task",
+        _return_workspace_obj,
+    )
+    monkeypatch.setattr(async_session, "commit", _noop)
+    monkeypatch.setattr(async_session, "refresh", _noop)
+
+    resp = await candidate_submissions.codespace_status(
+        task_id=task.id,
+        candidate_session=cs,
+        db=async_session,
+    )
+    assert resp.codespaceUrl == "https://codespaces.new/org/repo?quickstart=1"
+    assert workspace.codespace_url == "https://codespaces.new/org/repo?quickstart=1"
+
+
+@pytest.mark.asyncio
+async def test_codespace_status_missing_repo_full_name(monkeypatch, async_session):
+    cs = _stub_cs()
+    task = _stub_task()
+    workspace = _stub_workspace()
+    workspace.repo_full_name = ""
+
+    async def _return_task(*_a, **_k):
+        return task
+
+    async def _return_workspace_obj(*_a, **_kw):
+        return workspace
+
+    monkeypatch.setattr(
+        candidate_submissions.submission_service,
+        "load_task_or_404",
+        _return_task,
+    )
+    monkeypatch.setattr(
+        candidate_submissions.workspace_repo,
+        "get_by_session_and_task",
+        _return_workspace_obj,
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        await candidate_submissions.codespace_status(
+            task_id=task.id,
+            candidate_session=cs,
+            db=async_session,
+        )
+    assert excinfo.value.status_code == 409
 
 
 @pytest.mark.asyncio
