@@ -29,30 +29,6 @@ async def test_github_client_happy_paths():
             return httpx.Response(200, json={"name": "main"})
         if request.method == "GET" and "/compare/" in request.url.path:
             return httpx.Response(200, json={"ahead_by": 1})
-        if request.method == "GET" and request.url.path.endswith("/codespaces"):
-            return httpx.Response(
-                200,
-                json={
-                    "codespaces": [
-                        {
-                            "name": "codespace-1",
-                            "web_url": "https://github.com/codespaces/org/repo",
-                            "state": "available",
-                            "repository": {"full_name": "org/repo"},
-                        }
-                    ]
-                },
-            )
-        if request.method == "POST" and request.url.path.endswith("/codespaces"):
-            return httpx.Response(
-                201,
-                json={
-                    "name": "codespace-2",
-                    "web_url": "https://github.com/codespaces/org/repo-2",
-                    "state": "creating",
-                    "repository": {"full_name": "org/repo"},
-                },
-            )
         if request.method == "GET" and "/zip" in request.url.path:
             return httpx.Response(
                 200,
@@ -85,12 +61,6 @@ async def test_github_client_happy_paths():
 
     compare = await client.get_compare("org/repo", "base", "head")
     assert compare["ahead_by"] == 1
-
-    codespaces = await client.list_codespaces_for_repo("org/repo")
-    assert codespaces[0].name == "codespace-1"
-
-    created = await client.create_codespace("org/repo")
-    assert created.name == "codespace-2"
 
     artifacts = await client.list_artifacts("org/repo", 123)
     assert artifacts[0]["id"] == 1

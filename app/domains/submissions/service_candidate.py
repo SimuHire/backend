@@ -364,5 +364,5 @@ def summarize_diff(
 
 
 def build_codespace_url(repo_full_name: str) -> str:
-    """Return a GitHub URL to create/open a Codespace for the repo."""
-    return f"https://github.com/codespaces/new?repo={repo_full_name}"
+    """Return a Codespaces deep link to resume or create a workspace."""
+    return f"https://codespaces.new/{repo_full_name}?quickstart=1"

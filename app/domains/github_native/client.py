@@ -33,14 +33,6 @@ class WorkflowRun:
     created_at: str | None = None
 
 
-@dataclass
-class CodespaceSummary:
-    """Minimal Codespace metadata."""
-
-    name: str
-    web_url: str | None
-    state: str | None
-    repo_full_name: str | None = None
 
 
 class GithubClient:
@@ -157,27 +149,6 @@ class GithubClient:
         path = f"/repos/{owner}/{repo}/compare/{base}...{head}"
         return await self._get_json(path)
 
-    async def list_codespaces_for_repo(
-        self, repo_full_name: str
-    ) -> list[CodespaceSummary]:
-        """List codespaces provisioned for a repository."""
-        owner, repo = self._split_full_name(repo_full_name)
-        path = f"/repos/{owner}/{repo}/codespaces"
-        data = await self._get_json(path)
-        codespaces = data.get("codespaces") or []
-        return [self._parse_codespace(c) for c in codespaces]
-
-    async def create_codespace(
-        self, repo_full_name: str, *, ref: str | None = None
-    ) -> CodespaceSummary:
-        """Create a codespace for a repository."""
-        owner, repo = self._split_full_name(repo_full_name)
-        path = f"/repos/{owner}/{repo}/codespaces"
-        payload: dict[str, Any] = {}
-        if ref:
-            payload["ref"] = ref
-        data = await self._post_json(path, json=payload)
-        return self._parse_codespace(data)
 
     async def list_artifacts(
         self, repo_full_name: str, run_id: int
@@ -208,14 +179,6 @@ class GithubClient:
             created_at=payload.get("created_at"),
         )
 
-    def _parse_codespace(self, payload: dict[str, Any]) -> CodespaceSummary:
-        repo = payload.get("repository") or {}
-        return CodespaceSummary(
-            name=str(payload.get("name") or ""),
-            web_url=payload.get("web_url") or payload.get("html_url"),
-            state=payload.get("state"),
-            repo_full_name=repo.get("full_name"),
-        )
 
     def _split_full_name(self, full_name: str) -> tuple[str, str]:
         if not full_name or "/" not in full_name:

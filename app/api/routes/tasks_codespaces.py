@@ -11,7 +11,7 @@ from app.api.dependencies.candidate_sessions import candidate_session_from_heade
 from app.api.dependencies.github_native import get_actions_runner, get_github_client
 from app.domains import CandidateSession, Task
 from app.domains.candidate_sessions import service as cs_service
-from app.domains.github_native import CodespaceSummary, GithubClient, GithubError
+from app.domains.github_native import GithubClient, GithubError
 from app.domains.github_native.actions_runner import GithubActionsRunner
 from app.domains.github_native.workspaces import repository as workspace_repo
 from app.domains.submissions import service_candidate as submission_service
@@ -61,18 +61,6 @@ def _rate_limit_or_429(candidate_session_id: int, action: str) -> None:
 async def _compute_current_task(db: AsyncSession, cs: CandidateSession) -> Task | None:
     tasks, _, current, *_ = await cs_service.progress_snapshot(db, cs)
     return current
-
-
-def _select_codespace(codespaces: list[CodespaceSummary]) -> CodespaceSummary | None:
-    """Pick the best candidate codespace from a list."""
-    if not codespaces:
-        return None
-    preferred_states = {"available", "running", "active"}
-    for space in codespaces:
-        state = (space.state or "").lower()
-        if state in preferred_states:
-            return space
-    return codespaces[0]
 
 
 @router.post(
@@ -148,7 +136,6 @@ async def codespace_status(
         CandidateSession, Depends(candidate_session_from_headers)
     ],
     db: Annotated[AsyncSession, Depends(get_session)],
-    github_client: Annotated[GithubClient, Depends(get_github_client)],
 ) -> CodespaceStatusResponse:
     """Return current workspace status for a task."""
     cs = candidate_session
@@ -172,52 +159,10 @@ async def codespace_status(
 
     codespace_url = workspace.codespace_url
     if not codespace_url:
-        codespace = None
-        try:
-            codespaces = await github_client.list_codespaces_for_repo(
-                workspace.repo_full_name
-            )
-            codespace = _select_codespace(codespaces)
-        except GithubError as exc:
-            logger.warning(
-                "github_codespace_list_failed",
-                extra={
-                    "task_id": task.id,
-                    "candidate_session_id": cs.id,
-                    "workspace_id": workspace.id,
-                    "status_code": exc.status_code,
-                },
-            )
-
-        if codespace is None and settings.github.GITHUB_CODESPACES_CREATE_ENABLED:
-            try:
-                codespace = await github_client.create_codespace(
-                    workspace.repo_full_name, ref=workspace.default_branch
-                )
-            except GithubError as exc:
-                logger.warning(
-                    "github_codespace_create_failed",
-                    extra={
-                        "task_id": task.id,
-                        "candidate_session_id": cs.id,
-                        "workspace_id": workspace.id,
-                        "status_code": exc.status_code,
-                    },
-                )
-
-        if codespace is not None:
-            codespace_url = (
-                codespace.web_url
-                or submission_service.build_codespace_url(workspace.repo_full_name)
-            )
-            workspace.codespace_name = codespace.name or workspace.codespace_name
-            workspace.codespace_url = codespace_url
-            workspace.codespace_state = codespace.state
-            await db.commit()
-            await db.refresh(workspace)
-
-    if not codespace_url:
         codespace_url = submission_service.build_codespace_url(workspace.repo_full_name)
+        workspace.codespace_url = codespace_url
+        await db.commit()
+        await db.refresh(workspace)
 
     return CodespaceStatusResponse(
         repoFullName=workspace.repo_full_name,

@@ -157,7 +157,6 @@ class GithubSettings(BaseSettings):
     GITHUB_ACTIONS_WORKFLOW_FILE: str = "tenon-ci.yml"
     GITHUB_REPO_PREFIX: str = "tenon-ws-"
     GITHUB_CLEANUP_ENABLED: bool = False
-    GITHUB_CODESPACES_CREATE_ENABLED: bool = True
 
     model_config = SettingsConfigDict(extra="ignore", env_prefix="TENON_")
 
@@ -212,7 +211,6 @@ class Settings(BaseSettings):
     GITHUB_ACTIONS_WORKFLOW_FILE: str | None = None
     GITHUB_REPO_PREFIX: str | None = None
     GITHUB_CLEANUP_ENABLED: bool | None = None
-    GITHUB_CODESPACES_CREATE_ENABLED: bool | None = None
 
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     auth: AuthSettings = Field(default_factory=AuthSettings)
@@ -250,7 +248,6 @@ class Settings(BaseSettings):
             "GITHUB_ACTIONS_WORKFLOW_FILE",
             "GITHUB_REPO_PREFIX",
             "GITHUB_CLEANUP_ENABLED",
-            "GITHUB_CODESPACES_CREATE_ENABLED",
         }
         email_keys = {
             "TENON_EMAIL_PROVIDER",

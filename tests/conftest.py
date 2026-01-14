@@ -73,12 +73,6 @@ async def async_client(db_session: AsyncSession):
                 "path: artifacts/tenon-test-results.json",
             ]
         )
-        class _Codespace:
-            def __init__(self, name: str, web_url: str, state: str):
-                self.name = name
-                self.web_url = web_url
-                self.state = state
-
         async def generate_repo_from_template(
             self,
             *,
@@ -115,15 +109,6 @@ async def async_client(db_session: AsyncSession):
         async def get_compare(self, repo_full_name: str, base: str, head: str):
             return {"ahead_by": 0, "behind_by": 0, "total_commits": 0, "files": []}
 
-        async def list_codespaces_for_repo(self, repo_full_name: str):
-            return []
-
-        async def create_codespace(self, repo_full_name: str, *, ref: str | None = None):
-            return self._Codespace(
-                name="codespace-test",
-                web_url=f"https://github.com/codespaces/{repo_full_name}",
-                state="available",
-            )
 
     async def override_get_session():
         yield db_session
@@ -229,12 +214,6 @@ def actions_stubber():
                 return self._result
 
         class StubGithubClient:
-            class _Codespace:
-                def __init__(self, name: str, web_url: str, state: str):
-                    self.name = name
-                    self.web_url = web_url
-                    self.state = state
-
             async def generate_repo_from_template(
                 self,
                 *,
@@ -260,17 +239,6 @@ def actions_stubber():
             async def get_compare(self, repo_full_name: str, base: str, head: str):
                 return {"ahead_by": 0, "behind_by": 0, "total_commits": 0, "files": []}
 
-            async def list_codespaces_for_repo(self, repo_full_name: str):
-                return []
-
-            async def create_codespace(
-                self, repo_full_name: str, *, ref: str | None = None
-            ):
-                return self._Codespace(
-                    name="codespace-test",
-                    web_url=f"https://github.com/codespaces/{repo_full_name}",
-                    state="available",
-                )
 
         runner = StubActionsRunner(result, error)
         app.dependency_overrides[candidate_submissions.get_actions_runner] = (
