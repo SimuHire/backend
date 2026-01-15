@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import User
-from app.infra.config import settings  # noqa: F401
+from app.infra.config import settings
 from app.infra.db import async_session_maker, get_session
 from app.infra.env import env_name as _env_name_base
 from app.infra.security.principal import (

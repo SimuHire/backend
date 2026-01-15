@@ -70,6 +70,7 @@ def get_jwks() -> dict[str, Any]:
 
 
 def clear_jwks_cache() -> None:
+    """Reset the in-memory JWKS cache."""
     with _jwks_lock:
         _jwks_cache["jwks"] = None
         _jwks_cache["fetched_at"] = 0.0
