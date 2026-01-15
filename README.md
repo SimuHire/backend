@@ -83,6 +83,7 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 
 - DB: `TENON_DATABASE_URL`, `TENON_DATABASE_URL_SYNC` (sync used by Alembic; async derived automatically; SQLite fallback `local.db` if unset).
 - Auth0: `TENON_AUTH0_DOMAIN`, `TENON_AUTH0_ISSUER`, `TENON_AUTH0_JWKS_URL`, `TENON_AUTH0_API_AUDIENCE`, `TENON_AUTH0_ALGORITHMS`, `TENON_AUTH0_CLAIM_NAMESPACE`, `TENON_AUTH0_EMAIL_CLAIM`, `TENON_AUTH0_ROLES_CLAIM`, `TENON_AUTH0_PERMISSIONS_CLAIM`.
+- Auth0 alignment: `TENON_AUTH0_ISSUER` should match the frontend issuer (including trailing slash), and `TENON_AUTH0_API_AUDIENCE` should match the frontend API audience; the backend is stateless (no cookies/sessions) and does not generate Auth0 logout URLs.
 - Auth0 Post Login Action must set `https://tenon.ai/permissions` (and `permissions`) on both access and ID tokens so first-login candidates receive `candidate:access`.
 - CORS: `TENON_CORS_ALLOW_ORIGINS` (JSON array or comma list), `TENON_CORS_ALLOW_ORIGIN_REGEX`.
 - Security: `TENON_RATE_LIMIT_ENABLED`, `TENON_MAX_REQUEST_BODY_BYTES`, `TENON_TRUSTED_PROXY_CIDRS`.

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.domains import User
 from app.domains.users.schemas import UserRead
@@ -22,3 +22,9 @@ async def read_me(
         key = rate_limit.rate_limit_key("auth_me", rate_limit.client_id(request))
         rate_limit.limiter.allow(key, AUTH_ME_RATE_LIMIT)
     return current_user
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response) -> None:
+    """Stateless logout endpoint; backend does not manage sessions or redirects."""
+    response.headers["Cache-Control"] = "no-store"

@@ -89,3 +89,12 @@ async def test_auth_me_rate_limited_in_prod(
 
     auth_routes.AUTH_ME_RATE_LIMIT = original_rule
     auth_routes.rate_limit.limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_auth_logout_is_stateless(async_client):
+    res = await async_client.post("/api/auth/logout")
+
+    assert res.status_code == 204
+    assert res.headers.get("cache-control") == "no-store"
+    assert "set-cookie" not in res.headers
