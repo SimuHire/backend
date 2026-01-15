@@ -64,7 +64,7 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 ## Local Development
 
 - Prereqs: Python 3.11+, Poetry, Postgres (or SQLite fallback).
-- Install: `poetry install`; configure `.env` (sample included—rotate secrets).
+- Install: `poetry install`; configure `.env` from `.env.example` (do not commit `.env`; use Render env vars in prod).
 - Seed dev recruiters: `ENV=local DEV_AUTH_BYPASS=1 poetry run python scripts/seed_local_recruiters.py`.
 - Run: `poetry run uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000` or `./runBackend.sh`.
 - Migrations: `poetry run alembic upgrade head` (uses `DATABASE_URL_SYNC`).
@@ -81,13 +81,18 @@ FastAPI + Postgres backend for Tenon. Recruiters create 5-day simulations, invit
 
 ## Configuration
 
+- Core: `TENON_ENV`, `TENON_API_PREFIX`.
 - DB: `TENON_DATABASE_URL`, `TENON_DATABASE_URL_SYNC` (sync used by Alembic; async derived automatically; SQLite fallback `local.db` if unset).
-- Auth0: `TENON_AUTH0_DOMAIN`, `TENON_AUTH0_ISSUER`, `TENON_AUTH0_JWKS_URL`, `TENON_AUTH0_API_AUDIENCE`, `TENON_AUTH0_ALGORITHMS`, `TENON_AUTH0_CLAIM_NAMESPACE`, `TENON_AUTH0_EMAIL_CLAIM`, `TENON_AUTH0_ROLES_CLAIM`, `TENON_AUTH0_PERMISSIONS_CLAIM`.
+- Auth0: `TENON_AUTH0_DOMAIN`, `TENON_AUTH0_ISSUER`, `TENON_AUTH0_JWKS_URL`, `TENON_AUTH0_API_AUDIENCE`, `TENON_AUTH0_ALGORITHMS`, `TENON_AUTH0_JWKS_CACHE_TTL_SECONDS`, `TENON_AUTH0_LEEWAY_SECONDS`, `TENON_AUTH0_CLAIM_NAMESPACE`, `TENON_AUTH0_EMAIL_CLAIM`, `TENON_AUTH0_ROLES_CLAIM`, `TENON_AUTH0_PERMISSIONS_CLAIM`.
+- Auth0 connections (currently unused by backend): `TENON_CANDIDATE_CONNECTION_NAME`, `TENON_RECRUITER_CONNECTION_NAME`.
+- Auth0 alignment: `TENON_AUTH0_ISSUER` should match the frontend issuer (including trailing slash), and `TENON_AUTH0_API_AUDIENCE` should match the frontend API audience; the backend is stateless (no cookies/sessions) and does not generate Auth0 logout URLs.
+- Auth0 JWT validation: JWKS are cached for `TENON_AUTH0_JWKS_CACHE_TTL_SECONDS` (default 3600s) and refreshed on unknown `kid`; clock skew leeway is `TENON_AUTH0_LEEWAY_SECONDS` (default 60s).
 - Auth0 Post Login Action must set `https://tenon.ai/permissions` (and `permissions`) on both access and ID tokens so first-login candidates receive `candidate:access`.
 - CORS: `TENON_CORS_ALLOW_ORIGINS` (JSON array or comma list), `TENON_CORS_ALLOW_ORIGIN_REGEX`.
 - Security: `TENON_RATE_LIMIT_ENABLED`, `TENON_MAX_REQUEST_BODY_BYTES`, `TENON_TRUSTED_PROXY_CIDRS`.
 - Candidate portal: `TENON_CANDIDATE_PORTAL_BASE_URL` (used for invite links).
 - GitHub: `TENON_GITHUB_API_BASE`, `TENON_GITHUB_ORG`, `TENON_GITHUB_TEMPLATE_OWNER`, `TENON_GITHUB_REPO_PREFIX`, `TENON_GITHUB_ACTIONS_WORKFLOW_FILE`, `TENON_GITHUB_TOKEN`, `TENON_GITHUB_CLEANUP_ENABLED` (future).
+- Email: `TENON_EMAIL_PROVIDER`, `TENON_EMAIL_FROM`, `TENON_RESEND_API_KEY`.
 - Admin: `TENON_ADMIN_API_KEY` (required for admin endpoints).
 - Dev bypass: `DEV_AUTH_BYPASS=1` (local only; app aborts otherwise).
 

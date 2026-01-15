@@ -1,5 +1,5 @@
+import httpx
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.api.routes import auth as auth_routes
@@ -33,7 +33,10 @@ async def test_auth_me_creates_and_returns_user(
     monkeypatch.setattr(auth0, "decode_auth0_token", fake_decode_auth0_token)
     monkeypatch.setattr(current_user, "async_session_maker", session_maker)
     with override_dependencies({get_session: override_get_session}):
-        async with AsyncClient(app=app, base_url="http://testserver") as client:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             response = await client.get(
                 "/api/auth/me",
                 headers={"Authorization": "Bearer fake-token"},
@@ -74,7 +77,10 @@ async def test_auth_me_rate_limited_in_prod(
     )
 
     with override_dependencies({get_session: override_get_session}):
-        async with AsyncClient(app=app, base_url="http://testserver") as client:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as client:
             first = await client.get(
                 "/api/auth/me",
                 headers={"Authorization": "Bearer fake-token"},
@@ -89,3 +95,14 @@ async def test_auth_me_rate_limited_in_prod(
 
     auth_routes.AUTH_ME_RATE_LIMIT = original_rule
     auth_routes.rate_limit.limiter.reset()
+
+
+@pytest.mark.asyncio
+async def test_auth_logout_is_stateless(async_client):
+    res = await async_client.post("/api/auth/logout")
+
+    assert res.status_code == 204
+    assert res.headers.get("cache-control") == "no-store"
+    assert res.headers.get("pragma") == "no-cache"
+    assert "set-cookie" not in res.headers
+    assert res.headers.get("location") is None

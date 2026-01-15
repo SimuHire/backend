@@ -69,13 +69,11 @@ def get_jwks() -> dict[str, Any]:
         ) from exc
 
 
-def _clear_jwks_cache() -> None:
+def clear_jwks_cache() -> None:
+    """Reset the in-memory JWKS cache."""
     with _jwks_lock:
         _jwks_cache["jwks"] = None
         _jwks_cache["fetched_at"] = 0.0
-
-
-get_jwks.cache_clear = _clear_jwks_cache  # type: ignore[attr-defined]
 
 
 def _log_failure(reason: str, *, kid: str | None, alg: str | None) -> None:
@@ -118,7 +116,7 @@ def decode_auth0_token(token: str) -> dict[str, Any]:
             break
 
     if key is None:
-        get_jwks.cache_clear()
+        clear_jwks_cache()
         jwks = get_jwks()
         for jwk in jwks.get("keys", []):
             if jwk.get("kid") == kid:

@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -42,10 +41,7 @@ async def lifespan(_app: FastAPI):
 def create_app() -> FastAPI:
     """Instantiate and configure the FastAPI application."""
     configure_logging()
-    dev_bypass_flag = getattr(settings, "DEV_AUTH_BYPASS", None) or os.getenv(
-        "DEV_AUTH_BYPASS"
-    )
-    if dev_bypass_flag == "1" and _env_name() != "local":
+    if settings.dev_auth_bypass_enabled and _env_name() != "local":
         raise RuntimeError(
             "Refusing to start: DEV_AUTH_BYPASS enabled outside ENV=local"
         )

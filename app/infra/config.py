@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CLAIM_NAMESPACE = "https://tenon.ai"
@@ -193,6 +193,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool | None = None
     MAX_REQUEST_BODY_BYTES: int = 1_048_576
     TRUSTED_PROXY_CIDRS: list[str] | str = Field(default_factory=list)
+    DEV_AUTH_BYPASS: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("DEV_AUTH_BYPASS", "TENON_DEV_AUTH_BYPASS"),
+    )
 
     # Flat env hooks (loaded from .env and merged into nested models)
     DATABASE_URL: str | None = None
@@ -222,6 +226,8 @@ class Settings(BaseSettings):
     email: EmailSettings = Field(default_factory=EmailSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
+    CANDIDATE_CONNECTION_NAME: str = ""
+    RECRUITER_CONNECTION_NAME: str = ""
     ADMIN_API_KEY: str = ""
 
     @field_validator("TRUSTED_PROXY_CIDRS", mode="before")
@@ -257,6 +263,7 @@ class Settings(BaseSettings):
             "AUTH0_API_AUDIENCE",
             "AUTH0_ALGORITHMS",
             "AUTH0_JWKS_CACHE_TTL_SECONDS",
+            "AUTH0_LEEWAY_SECONDS",
             "AUTH0_CLAIM_NAMESPACE",
             "AUTH0_EMAIL_CLAIM",
             "AUTH0_ROLES_CLAIM",
@@ -405,6 +412,16 @@ class Settings(BaseSettings):
             self.auth.AUTH0_JWKS_URL = value
             return
         super().__setattr__(name, value)
+
+    @property
+    def dev_auth_bypass_enabled(self) -> bool:
+        """Return True when DEV_AUTH_BYPASS is enabled."""
+        env_val = os.getenv("DEV_AUTH_BYPASS")
+        if env_val is None:
+            env_val = os.getenv("TENON_DEV_AUTH_BYPASS")
+        value = (env_val if env_val is not None else self.DEV_AUTH_BYPASS) or ""
+        value = value.strip()
+        return value == "1"
 
 
 settings = Settings()

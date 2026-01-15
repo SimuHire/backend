@@ -1,8 +1,11 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import base64
 import os
 from contextlib import contextmanager
+
+os.environ.setdefault("TENON_ENV", "test")
 
 import pytest
 import pytest_asyncio
@@ -20,6 +23,9 @@ from app.infra.db import get_session
 from app.infra.security.current_user import get_current_user
 from app.infra.security.principal import Principal, get_principal
 from app.main import app
+
+settings.ENV = "test"
+settings.RATE_LIMIT_ENABLED = None
 
 
 @pytest.fixture(scope="session")

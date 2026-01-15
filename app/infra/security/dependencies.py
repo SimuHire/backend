@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sys
 from typing import Annotated
 
@@ -11,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import User
-from app.infra.config import settings  # noqa: F401
+from app.infra.config import settings
 from app.infra.db import async_session_maker, get_session
 from app.infra.env import env_name as _env_name_base
 from app.infra.security.principal import (
@@ -45,7 +44,7 @@ async def _dev_bypass_user(request: Request, db: AsyncSession | None) -> User | 
     dev_email = (request.headers.get("x-dev-user-email") or "").strip().lower()
     if not dev_email:
         return None
-    dev_bypass_env = os.getenv("DEV_AUTH_BYPASS") == "1"
+    dev_bypass_env = settings.dev_auth_bypass_enabled
 
     env_name = _env_name()
     if dev_bypass_env and env_name != "local":
