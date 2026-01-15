@@ -25,6 +25,9 @@ async def test_auth_me_requires_auth_header(async_session):
     assert res.status_code == 401
     assert res.headers["content-type"].startswith("application/json")
     assert res.headers.get("location") is None
+    body = res.json()
+    assert "detail" in body
+    assert isinstance(body["detail"], str)
 
 
 @pytest.mark.asyncio
@@ -52,6 +55,9 @@ async def test_auth_me_missing_email_claim(async_session, monkeypatch):
         app.dependency_overrides.pop(get_session, None)
 
     assert res.status_code == 401
+    body = res.json()
+    assert "detail" in body
+    assert isinstance(body["detail"], str)
 
 
 @pytest.mark.asyncio
@@ -80,3 +86,6 @@ async def test_auth_me_expired_token_returns_json_401(async_session, monkeypatch
     assert res.status_code == 401
     assert res.headers["content-type"].startswith("application/json")
     assert res.headers.get("location") is None
+    body = res.json()
+    assert "detail" in body
+    assert isinstance(body["detail"], str)

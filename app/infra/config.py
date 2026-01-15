@@ -257,6 +257,7 @@ class Settings(BaseSettings):
             "AUTH0_API_AUDIENCE",
             "AUTH0_ALGORITHMS",
             "AUTH0_JWKS_CACHE_TTL_SECONDS",
+            "AUTH0_LEEWAY_SECONDS",
             "AUTH0_CLAIM_NAMESPACE",
             "AUTH0_EMAIL_CLAIM",
             "AUTH0_ROLES_CLAIM",

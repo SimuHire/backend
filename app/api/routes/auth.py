@@ -24,7 +24,7 @@ async def read_me(
     return current_user
 
 
-@router.post("/logout")
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout() -> Response:
     """Stateless logout endpoint; backend does not manage sessions or redirects."""
     return Response(
