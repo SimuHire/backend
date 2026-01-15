@@ -1,6 +1,9 @@
+import time
+
 import pytest
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
+from jose.utils import base64url_encode
 
 from app.infra.security import auth0
 
@@ -211,6 +214,26 @@ def test_decode_auth0_token_refreshes_jwks_on_kid_miss(monkeypatch):
     assert claims["email"] == "ok@example.com"
 
 
+def test_decode_auth0_token_refreshes_once_and_still_missing(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    monkeypatch.setattr(
+        jwt, "get_unverified_header", lambda _t: {"kid": "missing", "alg": "RS256"}
+    )
+
+    calls = []
+
+    def fake_fetch():
+        calls.append("fetch")
+        return {"keys": [{"kid": "other"}]}
+
+    monkeypatch.setattr(auth0, "_fetch_jwks", fake_fetch)
+
+    with pytest.raises(auth0.Auth0Error) as exc:
+        auth0.decode_auth0_token("tok")
+    assert "Signing key not found" in str(exc.value.detail)
+    assert calls == ["fetch", "fetch"]
+
+
 def test_decode_auth0_token_accepts_audience_list(monkeypatch):
     auth0.get_jwks.cache_clear()
     monkeypatch.setattr(
@@ -230,6 +253,89 @@ def test_decode_auth0_token_accepts_audience_list(monkeypatch):
 
     claims = auth0.decode_auth0_token("tok")
     assert claims["email"] == "ok@example.com"
+
+
+def test_decode_auth0_token_leeway_allows_recent_expiry(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    secret = "test-secret"
+    kid = "hs1"
+    leeway_seconds = 30
+
+    jwks = {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "oct",
+                "k": base64url_encode(secret.encode("utf-8")).decode("ascii"),
+                "alg": "HS256",
+                "use": "sig",
+            }
+        ]
+    }
+
+    monkeypatch.setattr(auth0, "_fetch_jwks", lambda: jwks)
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_ALGORITHMS", "HS256")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_API_AUDIENCE", "api://aud")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_ISSUER", "https://issuer.test/")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_LEEWAY_SECONDS", leeway_seconds)
+
+    now = int(time.time())
+    token = jwt.encode(
+        {
+            "sub": "auth0|leeway",
+            "aud": auth0.settings.auth.audience,
+            "iss": auth0.settings.auth.issuer,
+            "exp": now - (leeway_seconds - 5),
+        },
+        secret,
+        algorithm="HS256",
+        headers={"kid": kid},
+    )
+
+    claims = auth0.decode_auth0_token(token)
+    assert claims["sub"] == "auth0|leeway"
+
+
+def test_decode_auth0_token_leeway_rejects_too_old(monkeypatch):
+    auth0.get_jwks.cache_clear()
+    secret = "test-secret"
+    kid = "hs1"
+    leeway_seconds = 30
+
+    jwks = {
+        "keys": [
+            {
+                "kid": kid,
+                "kty": "oct",
+                "k": base64url_encode(secret.encode("utf-8")).decode("ascii"),
+                "alg": "HS256",
+                "use": "sig",
+            }
+        ]
+    }
+
+    monkeypatch.setattr(auth0, "_fetch_jwks", lambda: jwks)
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_ALGORITHMS", "HS256")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_API_AUDIENCE", "api://aud")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_ISSUER", "https://issuer.test/")
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_LEEWAY_SECONDS", leeway_seconds)
+
+    now = int(time.time())
+    token = jwt.encode(
+        {
+            "sub": "auth0|leeway",
+            "aud": auth0.settings.auth.audience,
+            "iss": auth0.settings.auth.issuer,
+            "exp": now - (leeway_seconds + 5),
+        },
+        secret,
+        algorithm="HS256",
+        headers={"kid": kid},
+    )
+
+    with pytest.raises(auth0.Auth0Error) as exc:
+        auth0.decode_auth0_token(token)
+    assert "expired" in str(exc.value.detail).lower()
 
 
 def test_issuer_normalization_used_for_decode(monkeypatch):
