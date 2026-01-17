@@ -84,7 +84,8 @@ async def test_parse_artifacts_prefers_named():
         contents={1: other_buf.getvalue(), 2: preferred_buf.getvalue()},
     )
     runner = GithubActionsRunner(client, workflow_file="ci.yml")
-    parsed = await runner._parse_artifacts("org/repo", 10)
+    parsed, error = await runner._parse_artifacts("org/repo", 10)
+    assert error is None
     assert parsed
     assert parsed.passed == 5
     assert parsed.failed == 1
@@ -100,8 +101,9 @@ async def test_parse_artifacts_skips_expired():
         contents={1: buf.getvalue()},
     )
     runner = GithubActionsRunner(client, workflow_file="ci.yml")
-    parsed = await runner._parse_artifacts("org/repo", 10)
+    parsed, error = await runner._parse_artifacts("org/repo", 10)
     assert parsed is None
+    assert error == "artifact_missing"
 
 
 def test_parse_test_results_handles_malformed_json_gracefully():
@@ -140,8 +142,9 @@ async def test_parse_artifacts_handles_bad_zip_without_crashing():
         contents={1: b"this-is-not-a-zip"},
     )
     runner = GithubActionsRunner(client, workflow_file="ci.yml")
-    parsed = await runner._parse_artifacts("org/repo", 42)
+    parsed, error = await runner._parse_artifacts("org/repo", 42)
     assert parsed is None
+    assert error == "artifact_corrupt"
 
 
 def test_parse_test_results_json_fallback_and_bad_xml():

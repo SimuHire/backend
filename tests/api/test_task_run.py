@@ -194,7 +194,7 @@ async def test_codespace_init_maps_github_errors_to_502(
         )
 
     assert resp.status_code == 502
-    assert "GitHub unavailable" in resp.json()["detail"]
+    assert "GitHub credentials" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -331,6 +331,38 @@ async def test_run_tests_invalid_task_404(
 
 
 @pytest.mark.asyncio
+async def test_run_tests_rejects_invalid_branch(
+    async_client, async_session, candidate_header_factory, actions_stubber
+):
+    actions_stubber()
+    recruiter = await create_recruiter(async_session, email="branch@test.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[0], content_text="day1"
+    )
+    await async_session.commit()
+
+    headers = candidate_header_factory(cs)
+    await async_client.post(
+        f"/api/tasks/{tasks[1].id}/codespace/init",
+        headers=headers,
+        json={"githubUsername": "octocat"},
+    )
+
+    resp = await async_client.post(
+        f"/api/tasks/{tasks[1].id}/run",
+        headers=headers,
+        json={"branch": "../bad"},
+    )
+
+    assert resp.status_code == 400
+    assert "branch" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_run_tests_missing_headers_returns_401(async_client):
     resp = await async_client.post("/api/tasks/1/run", json={})
     assert resp.status_code == 401
@@ -375,6 +407,70 @@ async def test_run_tests_handles_actions_error(
 
     assert resp.status_code == 502
     assert "GitHub unavailable" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_run_tests_maps_github_not_found_error(
+    async_client, async_session, candidate_header_factory, override_dependencies
+):
+    recruiter = await create_recruiter(async_session, email="run-notfound@sim.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[0], content_text="day1"
+    )
+    await async_session.commit()
+
+    class NotFoundRunner:
+        async def dispatch_and_wait(self, **_kwargs):
+            raise GithubError("missing", status_code=404)
+
+    class StubGithubClient:
+        async def generate_repo_from_template(
+            self,
+            *,
+            template_full_name: str,
+            new_repo_name: str,
+            owner=None,
+            private=True,
+        ):
+            return {
+                "full_name": f"org/{new_repo_name}",
+                "id": 1,
+                "default_branch": "main",
+            }
+
+        async def add_collaborator(self, *_a, **_k):
+            return {"ok": True}
+
+        async def get_branch(self, *_a, **_k):
+            return {"commit": {"sha": "base"}}
+
+        async def get_compare(self, *_a, **_k):
+            return {}
+
+    with override_dependencies(
+        {
+            candidate_submissions.get_actions_runner: lambda: NotFoundRunner(),
+            candidate_submissions.get_github_client: lambda: StubGithubClient(),
+        }
+    ):
+        headers = candidate_header_factory(cs)
+        await async_client.post(
+            f"/api/tasks/{tasks[1].id}/codespace/init",
+            headers=headers,
+            json={"githubUsername": "octocat"},
+        )
+        resp = await async_client.post(
+            f"/api/tasks/{tasks[1].id}/run",
+            headers=headers,
+            json={},
+        )
+
+    assert resp.status_code == 502
+    assert "not found" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

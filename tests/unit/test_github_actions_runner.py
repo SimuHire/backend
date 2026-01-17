@@ -71,8 +71,11 @@ async def test_dispatch_and_wait_returns_normalized_result(monkeypatch):
     )
 
     async def fake_parse(repo, run_id):
-        return ParsedTestResults(
-            passed=2, failed=1, total=3, stdout="ok", stderr="", summary={"s": 1}
+        return (
+            ParsedTestResults(
+                passed=2, failed=1, total=3, stdout="ok", stderr="", summary={"s": 1}
+            ),
+            None,
         )
 
     monkeypatch.setattr(runner, "_parse_artifacts", fake_parse)
@@ -281,8 +284,16 @@ async def test_build_result_sets_raw_when_missing(monkeypatch):
     )
 
     async def _fake_parse(repo, run_id):
-        return ParsedTestResults(
-            passed=1, failed=0, total=1, stdout="o", stderr=None, summary={"ok": True}
+        return (
+            ParsedTestResults(
+                passed=1,
+                failed=0,
+                total=1,
+                stdout="o",
+                stderr=None,
+                summary={"ok": True},
+            ),
+            None,
         )
 
     monkeypatch.setattr(runner, "_parse_artifacts", _fake_parse)
@@ -316,6 +327,33 @@ async def test_build_result_sets_raw_when_missing(monkeypatch):
     )
     result = await runner._build_result("org/repo", run)
     assert result.raw and result.raw["summary"]["ok"] is True
+    assert result.status == "passed"
+
+
+@pytest.mark.asyncio
+async def test_build_result_marks_error_when_artifacts_missing():
+    class MissingArtifactClient(GithubClient):
+        def __init__(self):
+            super().__init__(base_url="https://api.github.com", token="x")
+
+        async def list_artifacts(self, *_a, **_k):
+            return []
+
+    runner = GithubActionsRunner(MissingArtifactClient(), workflow_file="ci.yml")
+    run = WorkflowRun(
+        id=101,
+        status="completed",
+        conclusion="success",
+        html_url="https://example.com/run/101",
+        head_sha="sha101",
+        artifact_count=0,
+        event="workflow_dispatch",
+        created_at=datetime.now(UTC).isoformat(),
+    )
+    result = await runner._build_result("org/repo", run)
+    assert result.status == "error"
+    assert result.raw and result.raw.get("artifact_error") == "artifact_missing"
+    assert result.stderr and "artifact" in result.stderr.lower()
 
 
 def test_is_dispatched_run_invalid_created_at(monkeypatch):

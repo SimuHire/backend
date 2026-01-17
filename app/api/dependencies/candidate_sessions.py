@@ -16,7 +16,7 @@ from app.infra.security.principal import Principal
 async def candidate_session_from_headers(
     principal: Annotated[Principal, Depends(require_candidate_principal)],
     x_candidate_session_id: Annotated[
-        int | None, Header(alias="x-candidate-session-id")
+        int | None, Header(alias="x-candidate-session-id", ge=1)
     ] = None,
     db: Annotated[AsyncSession, Depends(get_session)] = None,
 ) -> CandidateSession:

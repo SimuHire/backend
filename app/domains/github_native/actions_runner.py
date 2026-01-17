@@ -207,7 +207,7 @@ class GithubActionsRunner:
         self, repo_full_name: str, run: WorkflowRun
     ) -> ActionsRunResult:
         base = self._normalize_run(run)
-        parsed = await self._parse_artifacts(repo_full_name, run.id)
+        parsed, artifact_error = await self._parse_artifacts(repo_full_name, run.id)
         if parsed:
             base.passed = parsed.passed
             base.failed = parsed.failed
@@ -217,11 +217,20 @@ class GithubActionsRunner:
             if base.raw is None:
                 base.raw = {}
             base.raw["summary"] = parsed.summary
+        elif artifact_error and run.conclusion:
+            base.status = "error"
+            if base.raw is None:
+                base.raw = {}
+            base.raw.setdefault("artifact_error", artifact_error)
+            base.stderr = (
+                base.stderr
+                or "Test results artifact missing or unreadable. Please re-run tests."
+            )
         return base
 
     async def _parse_artifacts(
         self, repo_full_name: str, run_id: int
-    ) -> ParsedTestResults | None:
+    ) -> tuple[ParsedTestResults | None, str | None]:
         artifacts = await self.client.list_artifacts(repo_full_name, run_id)
         preferred: list[dict[str, Any]] = []
         others: list[dict[str, Any]] = []
@@ -231,20 +240,27 @@ class GithubActionsRunner:
             name = str(artifact.get("name") or "").lower()
             (preferred if name in PREFERRED_ARTIFACT_NAMES else others).append(artifact)
 
+        found_artifact = False
+        last_error: str | None = None
         for artifact in preferred + others:
             artifact_id = artifact.get("id")
             if not artifact_id:
                 continue
+            found_artifact = True
             try:
                 content = await self.client.download_artifact_zip(
                     repo_full_name, int(artifact_id)
                 )
             except GithubError:
+                last_error = "artifact_download_failed"
                 continue
             parsed = parse_test_results_zip(content)
             if parsed:
-                return parsed
-        return None
+                return parsed, None
+            last_error = "artifact_corrupt"
+        if found_artifact:
+            return None, last_error or "artifact_unavailable"
+        return None, "artifact_missing"
 
     def _is_dispatched_run(
         self, run: WorkflowRun, dispatch_started_at: datetime

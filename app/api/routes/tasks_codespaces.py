@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.candidate_sessions import candidate_session_from_headers
 from app.api.dependencies.github_native import get_actions_runner, get_github_client
+from app.api.error_utils import map_github_error
 from app.domains import CandidateSession, Task
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.github_native import GithubClient, GithubError
@@ -123,10 +124,7 @@ async def init_codespace(
                 "error": str(exc),
             },
         )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="GitHub unavailable. Please try again.",
-        ) from exc
+        raise map_github_error(exc) from exc
 
     if not workspace.repo_full_name:
         raise HTTPException(
@@ -264,10 +262,7 @@ async def run_task_tests(
                 "error": str(exc),
             },
         )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="GitHub unavailable. Please try again.",
-        ) from exc
+        raise map_github_error(exc) from exc
     except Exception as exc:  # pragma: no cover - safety net
         logger.exception(
             "github_run_unhandled",
@@ -350,10 +345,7 @@ async def get_run_result(
                 "error": str(exc),
             },
         )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="GitHub unavailable. Please try again.",
-        ) from exc
+        raise map_github_error(exc) from exc
 
     await submission_service.record_run_result(db, workspace, result)
 
@@ -444,10 +436,7 @@ async def submit_task(
                     "error": str(exc),
                 },
             )
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="GitHub unavailable. Please try again.",
-            ) from exc
+            raise map_github_error(exc) from exc
         except Exception as exc:  # pragma: no cover - safety net
             logger.exception(
                 "github_submit_unhandled",

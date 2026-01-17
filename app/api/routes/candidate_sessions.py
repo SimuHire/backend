@@ -104,7 +104,7 @@ async def claim_candidate_session(
     response_model=CurrentTaskResponse,
 )
 async def get_current_task(
-    candidate_session_id: int,
+    candidate_session_id: Annotated[int, Path(..., ge=1)],
     request: Request,
     principal: Annotated[Principal, Depends(require_candidate_principal)],
     db: Annotated[AsyncSession, Depends(get_session)],

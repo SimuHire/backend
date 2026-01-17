@@ -17,6 +17,7 @@ from app.domains.simulations import repository as sim_repo
 from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
 from app.domains.tasks.template_catalog import (
     DEFAULT_TEMPLATE_KEY,
+    TemplateKeyError,
     resolve_template_repo_full_name,
     validate_template_key,
 )
@@ -74,9 +75,16 @@ async def create_simulation_with_tasks(
     db: AsyncSession, payload, user: Any
 ) -> tuple[Simulation, list[Task]]:
     """Create simulation and seed default tasks."""
-    template_key = validate_template_key(
-        getattr(payload, "templateKey", DEFAULT_TEMPLATE_KEY) or DEFAULT_TEMPLATE_KEY
-    )
+    try:
+        template_key = validate_template_key(
+            getattr(payload, "templateKey", DEFAULT_TEMPLATE_KEY)
+            or DEFAULT_TEMPLATE_KEY
+        )
+    except TemplateKeyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid templateKey",
+        ) from exc
 
     sim = Simulation(
         title=payload.title,

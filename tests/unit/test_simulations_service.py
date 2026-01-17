@@ -144,6 +144,26 @@ async def test_create_simulation_with_tasks_flow(async_session, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_create_simulation_with_tasks_rejects_bad_template(async_session):
+    payload = type(
+        "P",
+        (),
+        {
+            "title": "Title",
+            "role": "Role",
+            "techStack": "Python",
+            "seniority": "Mid",
+            "focus": "Build",
+            "templateKey": "not-real",
+        },
+    )()
+    user = type("U", (), {"company_id": 1, "id": 2})
+    with pytest.raises(Exception) as excinfo:
+        await sim_service.create_simulation_with_tasks(async_session, payload, user)
+    assert excinfo.value.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_create_invite_success(async_session):
     payload = type(
         "P", (), {"candidateName": "Jane", "inviteEmail": "jane@example.com"}
