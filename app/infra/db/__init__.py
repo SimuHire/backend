@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.infra.config import settings
 from app.infra.db.base import Base
+from app.infra.perf import attach_sqlalchemy_listeners
 
 DEFAULT_SQLITE_URL: Final[
     str
@@ -32,6 +33,7 @@ def _create_engine():
 
 
 engine = _create_engine()
+attach_sqlalchemy_listeners(engine)
 
 async_session_maker = async_sessionmaker(
     bind=engine,

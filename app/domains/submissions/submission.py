@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Index,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db.base import Base
@@ -16,6 +24,7 @@ class Submission(Base):
             "task_id",
             name="uq_submissions_candidate_session_task",
         ),
+        Index("ix_submissions_candidate_session_id", "candidate_session_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

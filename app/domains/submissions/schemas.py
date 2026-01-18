@@ -38,6 +38,7 @@ class RunTestsResponse(APIModel):
     conclusion: str | None = None
     workflowUrl: str | None = None
     commitSha: str | None = None
+    pollAfterMs: int | None = None
 
 
 class CodespaceInitRequest(BaseModel):

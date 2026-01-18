@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import io
+import json
+import zipfile
 
 import pytest
 
@@ -386,3 +389,92 @@ def test_is_dispatched_run_defaults_false():
         created_at=None,
     )
     assert runner._is_dispatched_run(run, datetime.now(UTC)) is False
+
+
+@pytest.mark.asyncio
+async def test_parse_artifacts_uses_cache():
+    class CacheClient(GithubClient):
+        def __init__(self):
+            super().__init__(base_url="https://api.github.com", token="x")
+            self.downloads = 0
+            self.list_calls = 0
+
+        async def list_artifacts(self, *_a, **_k):
+            self.list_calls += 1
+            return [{"id": 123, "name": "tenon-test-results"}]
+
+        async def download_artifact_zip(self, *_a, **_k):
+            self.downloads += 1
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w") as zf:
+                zf.writestr(
+                    "tenon-test-results.json",
+                    json.dumps({"passed": 1, "failed": 0, "total": 1}),
+                )
+            return buf.getvalue()
+
+    client = CacheClient()
+    runner = GithubActionsRunner(client, workflow_file="ci.yml")
+
+    parsed_first, err_first = await runner._parse_artifacts("org/repo", 9)
+    parsed_second, err_second = await runner._parse_artifacts("org/repo", 9)
+
+    assert client.downloads == 1
+    assert err_first is None and err_second is None
+    assert parsed_first and parsed_first.total == 1
+    assert parsed_second and parsed_second.total == 1
+    await client.aclose()
+
+
+def test_backoff_recommendations():
+    runner = GithubActionsRunner(
+        GithubClient(base_url="x", token="y"),
+        workflow_file="wf",
+        poll_interval_seconds=1.0,
+    )
+    key = ("org/repo", 55)
+    running = ActionsRunResult(
+        status="running",
+        run_id=55,
+        conclusion=None,
+        passed=None,
+        failed=None,
+        total=None,
+        stdout=None,
+        stderr=None,
+        head_sha=None,
+        html_url=None,
+    )
+    runner._apply_backoff(key, running)
+    assert running.poll_after_ms == 1000
+
+    running_again = ActionsRunResult(
+        status="running",
+        run_id=55,
+        conclusion=None,
+        passed=None,
+        failed=None,
+        total=None,
+        stdout=None,
+        stderr=None,
+        head_sha=None,
+        html_url=None,
+    )
+    runner._apply_backoff(key, running_again)
+    assert running_again.poll_after_ms == 2000
+
+    finished = ActionsRunResult(
+        status="passed",
+        run_id=55,
+        conclusion="success",
+        passed=1,
+        failed=0,
+        total=1,
+        stdout=None,
+        stderr=None,
+        head_sha=None,
+        html_url=None,
+    )
+    runner._apply_backoff(key, finished)
+    assert finished.poll_after_ms is None
+    assert key not in runner._poll_attempts

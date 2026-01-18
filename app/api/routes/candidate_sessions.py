@@ -45,7 +45,6 @@ async def resolve_candidate_session(
     cs = await cs_service.claim_invite_with_principal(
         db, token, principal, now=datetime.now(UTC)
     )
-    await db.refresh(cs, attribute_names=["simulation"])
     sim = cs.simulation
     return CandidateSessionResolveResponse(
         candidateSessionId=cs.id,
@@ -82,7 +81,6 @@ async def claim_candidate_session(
         rate_limit.limiter.allow(key, CANDIDATE_CLAIM_RATE_LIMIT)
     now = datetime.now(UTC)
     cs = await cs_service.claim_invite_with_principal(db, token, principal, now=now)
-    await db.refresh(cs, attribute_names=["simulation"])
 
     sim = cs.simulation
     return CandidateSessionResolveResponse(

@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db.base import Base
@@ -8,6 +8,9 @@ class Task(Base):
     """Task definition assigned within a simulation."""
 
     __tablename__ = "tasks"
+    __table_args__ = (
+        Index("ix_tasks_simulation_day_index", "simulation_id", "day_index"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     simulation_id: Mapped[int] = mapped_column(ForeignKey("simulations.id"))

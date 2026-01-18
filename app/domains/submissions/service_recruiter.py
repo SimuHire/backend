@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.domains import CandidateSession, Simulation, Submission, Task
 
@@ -62,15 +63,34 @@ async def list_submissions(
     recruiter_id: int,
     candidate_session_id: int | None,
     task_id: int | None,
-) -> list[tuple[Submission, Task, CandidateSession, Simulation]]:
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[tuple[Submission, Task]]:
     """List submissions for simulations owned by recruiter with optional filters."""
     stmt = (
-        select(Submission, Task, CandidateSession, Simulation)
+        select(Submission, Task)
         .join(Task, Task.id == Submission.task_id)
         .join(CandidateSession, CandidateSession.id == Submission.candidate_session_id)
         .join(Simulation, Simulation.id == CandidateSession.simulation_id)
         .where(Simulation.created_by == recruiter_id)
         .order_by(Submission.submitted_at.desc())
+        .options(
+            load_only(
+                Submission.id,
+                Submission.candidate_session_id,
+                Submission.task_id,
+                Submission.submitted_at,
+                Submission.code_repo_path,
+                Submission.workflow_run_id,
+                Submission.commit_sha,
+                Submission.diff_summary_json,
+                Submission.tests_passed,
+                Submission.tests_failed,
+                Submission.test_output,
+                Submission.last_run_at,
+            ),
+            load_only(Task.id, Task.day_index, Task.type),
+        )
     )
 
     if candidate_session_id is not None:
@@ -78,8 +98,12 @@ async def list_submissions(
     if task_id is not None:
         stmt = stmt.where(Submission.task_id == task_id)
 
-    rows = (await db.execute(stmt)).all()
-    return rows
+    if offset:
+        stmt = stmt.offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+
+    return (await db.execute(stmt)).all()
 
 
 def parse_test_output(test_output: str | None) -> dict[str, Any] | str | None:

@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.domains import CandidateSession, FitProfile, Simulation, Task
 from app.domains.candidate_sessions import repository as cs_repo
@@ -265,6 +266,19 @@ async def list_candidates_with_profile(
     """Return candidate sessions with attached report id if present."""
     stmt = (
         select(CandidateSession, FitProfile.id)
+        .options(
+            load_only(
+                CandidateSession.id,
+                CandidateSession.invite_email,
+                CandidateSession.candidate_name,
+                CandidateSession.status,
+                CandidateSession.started_at,
+                CandidateSession.completed_at,
+                CandidateSession.invite_email_status,
+                CandidateSession.invite_email_sent_at,
+                CandidateSession.invite_email_error,
+            )
+        )
         .outerjoin(
             FitProfile,
             FitProfile.candidate_session_id == CandidateSession.id,

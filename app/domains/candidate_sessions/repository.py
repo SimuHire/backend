@@ -28,6 +28,7 @@ async def get_by_token_for_update(
     stmt = (
         select(CandidateSession)
         .where(CandidateSession.token == token)
+        .options(selectinload(CandidateSession.simulation))
         .with_for_update()
     )
     res = await db.execute(stmt)
@@ -131,3 +132,21 @@ async def last_submission_at(
     )
     res = await db.execute(stmt)
     return res.scalar_one_or_none()
+
+
+async def last_submission_at_bulk(
+    db: AsyncSession, candidate_session_ids: list[int]
+) -> dict[int, datetime | None]:
+    """Return last submission timestamps keyed by candidate_session id."""
+    if not candidate_session_ids:
+        return {}
+    stmt = (
+        select(
+            Submission.candidate_session_id,
+            func.max(Submission.submitted_at),
+        )
+        .where(Submission.candidate_session_id.in_(candidate_session_ids))
+        .group_by(Submission.candidate_session_id)
+    )
+    res = await db.execute(stmt)
+    return {row[0]: row[1] for row in res.all()}

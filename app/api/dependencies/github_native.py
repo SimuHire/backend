@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -9,8 +10,8 @@ from app.domains.github_native.actions_runner import GithubActionsRunner
 from app.infra.config import settings
 
 
-def get_github_client() -> GithubClient:
-    """Default GitHub client dependency."""
+@lru_cache(maxsize=1)
+def _github_client_singleton() -> GithubClient:
     return GithubClient(
         base_url=settings.github.GITHUB_API_BASE,
         token=settings.github.GITHUB_TOKEN,
@@ -18,13 +19,30 @@ def get_github_client() -> GithubClient:
     )
 
 
-def get_actions_runner(
-    github_client: Annotated[GithubClient, Depends(get_github_client)],
-) -> GithubActionsRunner:
-    """Actions runner dependency with configured workflow file."""
+def get_github_client() -> GithubClient:
+    """Default GitHub client dependency."""
+    return _github_client_singleton()
+
+
+@lru_cache(maxsize=1)
+def _actions_runner_singleton() -> GithubActionsRunner:
     return GithubActionsRunner(
-        github_client,
+        _github_client_singleton(),
         workflow_file=settings.github.GITHUB_ACTIONS_WORKFLOW_FILE,
         poll_interval_seconds=2.0,
         max_poll_seconds=90.0,
     )
+
+
+def get_actions_runner(
+    github_client: Annotated[GithubClient, Depends(get_github_client)],
+) -> GithubActionsRunner:
+    """Actions runner dependency with configured workflow file."""
+    if github_client is not _github_client_singleton():
+        return GithubActionsRunner(
+            github_client,
+            workflow_file=settings.github.GITHUB_ACTIONS_WORKFLOW_FILE,
+            poll_interval_seconds=2.0,
+            max_poll_seconds=90.0,
+        )
+    return _actions_runner_singleton()

@@ -294,6 +294,7 @@ async def run_task_tests(
         conclusion=result.conclusion,
         workflowUrl=result.html_url,
         commitSha=result.head_sha,
+        pollAfterMs=result.poll_after_ms,
     )
 
 
@@ -362,6 +363,7 @@ async def get_run_result(
         conclusion=result.conclusion,
         workflowUrl=result.html_url,
         commitSha=result.head_sha,
+        pollAfterMs=result.poll_after_ms,
     )
 
 

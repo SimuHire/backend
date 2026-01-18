@@ -18,6 +18,7 @@ from app.infra.config import settings
 from app.infra.db import init_db_if_needed
 from app.infra.env import env_name
 from app.infra.logging import configure_logging
+from app.infra.perf import RequestPerfMiddleware, perf_logging_enabled
 from app.infra.proxy_headers import TrustedProxyHeadersMiddleware, trusted_proxy_cidrs
 from app.infra.request_limits import RequestSizeLimitMiddleware
 
@@ -36,7 +37,17 @@ def _env_name() -> str:
 async def lifespan(_app: FastAPI):
     """FastAPI lifespan handler to run startup/shutdown tasks."""
     await init_db_if_needed()
-    yield
+    try:
+        yield
+    finally:
+        try:
+            from app.api.dependencies.github_native import _github_client_singleton
+
+            client = _github_client_singleton()
+            await client.aclose()
+        except Exception:
+            # Best-effort cleanup; swallow errors to avoid blocking shutdown.
+            pass
 
 
 def create_app() -> FastAPI:
@@ -49,6 +60,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title=f"{APP_NAME} Backend", version="0.1.0", lifespan=lifespan)
 
+    _configure_perf_logging(app)
     _configure_proxy_headers(app)
     _configure_request_limits(app)
     _configure_cors(app)
@@ -98,6 +110,13 @@ def _configure_request_limits(app: FastAPI) -> None:
         RequestSizeLimitMiddleware,
         max_body_bytes=settings.MAX_REQUEST_BODY_BYTES,
     )
+
+
+def _configure_perf_logging(app: FastAPI) -> None:
+    """Attach perf middleware when enabled."""
+    if not perf_logging_enabled():
+        return
+    app.add_middleware(RequestPerfMiddleware)
 
 
 def _register_routers(app: FastAPI) -> None:

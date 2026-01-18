@@ -127,6 +127,17 @@ async def invite_list_for_principal(
     sessions = await cs_repo.list_for_email(db, email)
     items: list[CandidateInviteListItem] = []
     now = datetime.now(UTC)
+    session_ids = [cs.id for cs in sessions]
+    last_submitted_map = await cs_repo.last_submission_at_bulk(db, session_ids)
+    tasks_cache: dict[int, list[Task]] = {}
+
+    async def _tasks_for_simulation(simulation_id: int) -> list[Task]:
+        if simulation_id not in tasks_cache:
+            tasks_cache[simulation_id] = await cs_repo.tasks_for_simulation(
+                db, simulation_id
+            )
+        return tasks_cache[simulation_id]
+
     for cs in sessions:
         expires_at = cs.expires_at
         is_expired = False
@@ -137,16 +148,17 @@ async def invite_list_for_principal(
                 else expires_at
             )
             is_expired = exp < now
-        progress_tasks = await progress_snapshot(db, cs)
+        task_list = await _tasks_for_simulation(cs.simulation_id)
+        progress_tasks = await progress_snapshot(db, cs, tasks=task_list)
         (
-            tasks,
+            _tasks,
             completed_ids,
             _current,
             completed,
             total,
             _is_complete,
         ) = progress_tasks
-        last_submitted_at = await cs_repo.last_submission_at(db, cs.id)
+        last_submitted_at = last_submitted_map.get(cs.id)
         last_activity = last_submitted_at or cs.completed_at or cs.started_at
         sim = cs.simulation
         company_name = getattr(sim.company, "name", None) if sim else None
@@ -250,14 +262,17 @@ async def completed_task_ids(db: AsyncSession, candidate_session_id: int) -> set
 
 
 async def progress_snapshot(
-    db: AsyncSession, candidate_session: CandidateSession
+    db: AsyncSession,
+    candidate_session: CandidateSession,
+    *,
+    tasks: list[Task] | None = None,
 ) -> tuple[list[Task], set[int], Task | None, int, int, bool]:
     """Return tasks, completed ids, current task, and progress summary."""
-    tasks = await load_tasks(db, candidate_session.simulation_id)
+    task_list = tasks or await load_tasks(db, candidate_session.simulation_id)
     completed_ids = await completed_task_ids(db, candidate_session.id)
-    current = compute_current_task(tasks, completed_ids)
-    completed, total, is_complete = summarize_progress(len(tasks), completed_ids)
-    return tasks, completed_ids, current, completed, total, is_complete
+    current = compute_current_task(task_list, completed_ids)
+    completed, total, is_complete = summarize_progress(len(task_list), completed_ids)
+    return task_list, completed_ids, current, completed, total, is_complete
 
 
 def _ensure_not_expired(

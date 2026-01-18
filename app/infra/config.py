@@ -192,6 +192,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     RATE_LIMIT_ENABLED: bool | None = None
     MAX_REQUEST_BODY_BYTES: int = 1_048_576
+    DEBUG_PERF: bool = False
     TRUSTED_PROXY_CIDRS: list[str] | str = Field(default_factory=list)
     DEV_AUTH_BYPASS: str | None = Field(
         default=None,

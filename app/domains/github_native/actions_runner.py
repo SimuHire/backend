@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -34,6 +35,7 @@ class ActionsRunResult:
     head_sha: str | None
     html_url: str | None
     raw: dict[str, Any] | None = None
+    poll_after_ms: int | None = None
 
     @property
     def as_test_output(self) -> dict[str, Any]:
@@ -68,6 +70,14 @@ class GithubActionsRunner:
         self.workflow_file = workflow_file
         self.poll_interval_seconds = poll_interval_seconds
         self.max_poll_seconds = max_poll_seconds
+        self._run_cache: OrderedDict[
+            tuple[str, int], ActionsRunResult
+        ] = OrderedDict()
+        self._artifact_cache: OrderedDict[
+            tuple[str, int, int], tuple[ParsedTestResults | None, str | None]
+        ] = OrderedDict()
+        self._poll_attempts: dict[tuple[str, int], int] = {}
+        self._max_cache_entries = 128
         # Try preferred workflow file first, then Tenon defaults.
         self._workflow_fallbacks = list(
             dict.fromkeys(
@@ -110,11 +120,16 @@ class GithubActionsRunner:
                     else None
                 )
                 if conclusion or status == "completed":
-                    return await self._build_result(repo_full_name, candidate)
+                    result = await self._build_result(repo_full_name, candidate)
+                    self._cache_run_result((repo_full_name, candidate.id), result)
+                    return result
             await asyncio.sleep(self.poll_interval_seconds)
 
         if candidate:
-            return self._normalize_run(candidate, running=True)
+            result = self._normalize_run(candidate, running=True)
+            self._apply_backoff((repo_full_name, candidate.id), result)
+            self._cache_run_result((repo_full_name, candidate.id), result)
+            return result
         raise GithubError("No workflow run found after dispatch")
 
     async def _dispatch_with_fallbacks(
@@ -155,8 +170,15 @@ class GithubActionsRunner:
         self, *, repo_full_name: str, run_id: int
     ) -> ActionsRunResult:
         """Fetch an existing workflow run and normalize."""
+        cache_key = (repo_full_name, run_id)
+        cached = self._run_cache.get(cache_key)
+        if cached and cached.status != "running":
+            return cached
+
         run = await self.client.get_workflow_run(repo_full_name, run_id)
-        return await self._build_result(repo_full_name, run)
+        result = await self._build_result(repo_full_name, run)
+        self._cache_run_result(cache_key, result)
+        return result
 
     def _normalize_run(
         self, run: WorkflowRun, *, timed_out: bool = False, running: bool = False
@@ -226,6 +248,8 @@ class GithubActionsRunner:
                 base.stderr
                 or "Test results artifact missing or unreadable. Please re-run tests."
             )
+        cache_key = (repo_full_name, run.id)
+        self._apply_backoff(cache_key, base)
         return base
 
     async def _parse_artifacts(
@@ -247,6 +271,12 @@ class GithubActionsRunner:
             if not artifact_id:
                 continue
             found_artifact = True
+            cache_key = (repo_full_name, run_id, int(artifact_id))
+            cached = self._artifact_cache.get(cache_key)
+            if cached:
+                parsed_cached, cached_error = cached
+                if parsed_cached or cached_error:
+                    return parsed_cached, cached_error
             try:
                 content = await self.client.download_artifact_zip(
                     repo_full_name, int(artifact_id)
@@ -256,8 +286,10 @@ class GithubActionsRunner:
                 continue
             parsed = parse_test_results_zip(content)
             if parsed:
+                self._cache_artifact_result(cache_key, parsed, None)
                 return parsed, None
             last_error = "artifact_corrupt"
+            self._cache_artifact_result(cache_key, None, last_error)
         if found_artifact:
             return None, last_error or "artifact_unavailable"
         return None, "artifact_missing"
@@ -275,3 +307,36 @@ class GithubActionsRunner:
             except ValueError:
                 return False
         return False
+
+    def _cache_run_result(
+        self, key: tuple[str, int], result: ActionsRunResult
+    ) -> None:
+        self._run_cache[key] = result
+        self._run_cache.move_to_end(key)
+        if len(self._run_cache) > self._max_cache_entries:
+            self._run_cache.popitem(last=False)
+        if result.status != "running":
+            self._poll_attempts.pop(key, None)
+
+    def _cache_artifact_result(
+        self,
+        key: tuple[str, int, int],
+        parsed: ParsedTestResults | None,
+        error: str | None,
+    ) -> None:
+        self._artifact_cache[key] = (parsed, error)
+        self._artifact_cache.move_to_end(key)
+        if len(self._artifact_cache) > self._max_cache_entries:
+            self._artifact_cache.popitem(last=False)
+
+    def _apply_backoff(
+        self, key: tuple[str, int], result: ActionsRunResult
+    ) -> None:
+        if result.status == "running":
+            attempt = self._poll_attempts.get(key, 0) + 1
+            self._poll_attempts[key] = attempt
+            base_ms = int(self.poll_interval_seconds * 1000)
+            result.poll_after_ms = min(base_ms * (2 ** (attempt - 1)), 15000)
+        else:
+            self._poll_attempts.pop(key, None)
+            result.poll_after_ms = None
