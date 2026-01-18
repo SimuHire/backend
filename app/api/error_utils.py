@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.domains.github_native.client import GithubError
+from app.domains.tasks.template_catalog import ALLOWED_TEMPLATE_KEYS
 from app.infra.errors import ApiError
 
 
@@ -69,21 +70,10 @@ def validation_error_handler(_request, exc: RequestValidationError) -> JSONRespo
     error_code = "VALIDATION_ERROR"
     details: dict[str, Any] | None = None
     for err in sanitized:
-        msg = str(err.get("msg") or "").lower()
         loc = err.get("loc") or ()
-        if (
-            "templatekey" in "".join(str(part).lower() for part in loc)
-            and "invalid templatekey" in msg
-        ):
+        if any(str(part).lower() == "templatekey" for part in loc):
             error_code = "INVALID_TEMPLATE_KEY"
-            # try to extract allowed list from message text
-            text = str(err.get("msg") or "")
-            if "Allowed values:" in text:
-                allowed_text = text.split("Allowed values:", 1)[1]
-                allowed = [
-                    part.strip() for part in allowed_text.split(",") if part.strip()
-                ]
-                details = {"allowed": allowed}
+            details = {"allowed": sorted(ALLOWED_TEMPLATE_KEYS)}
             break
 
     payload: dict[str, Any] = {
