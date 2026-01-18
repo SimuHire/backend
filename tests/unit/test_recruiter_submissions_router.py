@@ -16,7 +16,9 @@ async def test_get_submission_detail_builds_links(monkeypatch):
         id=1,
         tests_passed=None,
         tests_failed=None,
-        test_output=json.dumps({"passed": 2, "failed": 1, "status": "failed"}),
+        test_output=json.dumps(
+            {"passed": 2, "failed": 1, "status": "failed", "conclusion": "failure"}
+        ),
         diff_summary_json=json.dumps({"base": "main", "head": "feature"}),
         code_repo_path="org/repo",
         content_text=None,
@@ -24,6 +26,8 @@ async def test_get_submission_detail_builds_links(monkeypatch):
         workflow_run_id="44",
         commit_sha="abc123",
         submitted_at=datetime.now(UTC),
+        workflow_run_conclusion=None,
+        workflow_run_status=None,
     )
     task = SimpleNamespace(
         id=2, day_index=1, type="code", title="T", prompt="P", description="D"
@@ -54,6 +58,7 @@ async def test_get_submission_detail_builds_links(monkeypatch):
     )
     assert result.diffUrl == "https://github.com/org/repo/compare/main...feature"
     assert result.testResults and result.testResults.total == 3
+    assert result.testResults.conclusion == "failure"
     assert result.workflowUrl.endswith("/runs/44")
     assert result.commitUrl.endswith("/commit/abc123")
 

@@ -130,6 +130,7 @@ def _build_test_results(
     last_run_at = getattr(sub, "last_run_at", None)
     total_val = None
     run_id = None
+    run_status = None
     conclusion = None
     timeout = None
     summary = None
@@ -212,20 +213,36 @@ def _build_test_results(
     ):
         return None
 
-    run_status = getattr(sub, "workflow_run_status", None)
-    if isinstance(run_status, str):
-        run_status = run_status.lower()
-    conclusion = getattr(sub, "workflow_run_conclusion", conclusion)
-    if isinstance(conclusion, str):
-        conclusion = conclusion.lower()
-    if run_status is None and isinstance(parsed_output, dict):
-        status_raw = parsed_output.get("status")
-        run_status = str(status_raw).lower() if status_raw else None
+    db_status = getattr(sub, "workflow_run_status", None)
+    if isinstance(db_status, str):
+        db_status = db_status.lower()
+    if db_status is not None:
+        run_status = db_status
+
+    db_conclusion = getattr(sub, "workflow_run_conclusion", None)
+    if isinstance(db_conclusion, str):
+        db_conclusion = db_conclusion.lower()
+    if db_conclusion is not None:
+        conclusion = db_conclusion
 
     if timeout is None and conclusion == "timed_out":
         timeout = True
 
     workflow_run_id_str = str(workflow_run_id) if workflow_run_id is not None else None
+
+    artifact_present = (
+        sanitized_output is not None
+        or passed_val is not None
+        or failed_val is not None
+        or total_val is not None
+    )
+    artifact_error = None
+    if isinstance(parsed_output, dict):
+        artifact_error = parsed_output.get("artifactErrorCode") or parsed_output.get(
+            "artifact_error_code"
+        )
+        if isinstance(artifact_error, str):
+            artifact_error = artifact_error.lower()
 
     result = {
         "status": status_str,
@@ -246,6 +263,9 @@ def _build_test_results(
         "commitSha": commit_sha,
         "workflowUrl": workflow_url,
         "commitUrl": commit_url,
+        "artifactName": "tenon-test-results" if artifact_present else None,
+        "artifactPresent": True if artifact_present else None,
+        "artifactErrorCode": artifact_error,
     }
 
     if include_output:

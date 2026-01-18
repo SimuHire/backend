@@ -144,6 +144,8 @@ async def test_recruiter_parses_structured_test_output(
     assert data["output"]["stdout"] == "prints"
     assert data["output"]["stderr"] == "boom"
     assert data["output"].get("summary") is None
+    assert data["artifactName"] == "tenon-test-results"
+    assert data["artifactPresent"] is True
 
 
 @pytest.mark.asyncio
@@ -196,6 +198,8 @@ async def test_recruiter_list_includes_links(async_client, async_session: AsyncS
     assert found["commitUrl"]
     assert found["diffUrl"]
     assert "output" not in (found.get("testResults") or {})
+    assert found["testResults"]["artifactName"] is None
+    assert found["testResults"]["artifactPresent"] is None
 
 
 @pytest.mark.asyncio
@@ -283,7 +287,9 @@ async def test_recruiter_submission_detail_includes_artifact_metadata(
     assert test_results["workflowRunId"] == "42"
     assert test_results["conclusion"] == "failure"
     assert test_results["summary"] == {"note": "check"}
-    assert test_results["runStatus"] == "failed"
+    assert test_results["runStatus"] is None
+    assert test_results["artifactName"] == "tenon-test-results"
+    assert test_results["artifactPresent"] is True
     assert test_results["stdout"].endswith("(truncated)")
     assert test_results["stdoutTruncated"] is True
     assert len(test_results["stdout"]) < len(long_stdout)
@@ -333,13 +339,15 @@ async def test_recruiter_submission_list_includes_test_results(
     assert test_results["passed"] == 4
     assert test_results["failed"] == 0
     assert test_results["total"] == 4
-    assert test_results["runStatus"] == "passed"
+    assert test_results["runStatus"] is None
     assert test_results["workflowUrl"].endswith("/actions/runs/321")
     assert test_results["commitUrl"].endswith("/commit/cafebabe")
     assert item["diffUrl"].endswith("/compare/main...feature2")
     assert "output" not in test_results or test_results["output"] is None
     assert test_results["stdoutTruncated"] is False
     assert test_results["stderrTruncated"] is False
+    assert test_results["artifactName"] == "tenon-test-results"
+    assert test_results["artifactPresent"] is True
 
 
 @pytest.mark.asyncio

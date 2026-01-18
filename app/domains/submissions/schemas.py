@@ -122,6 +122,9 @@ class RecruiterTestResultsOut(APIModel):
     summary: dict[str, object] | None = None
     stdoutTruncated: bool | None = None
     stderrTruncated: bool | None = None
+    artifactName: str | None = None
+    artifactPresent: bool | None = None
+    artifactErrorCode: str | None = None
     output: dict[str, object] | str | None = None
     lastRunAt: datetime | None = None
     workflowRunId: str | None = None
