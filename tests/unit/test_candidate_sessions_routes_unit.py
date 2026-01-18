@@ -35,6 +35,19 @@ async def test_candidate_session_rate_limits(monkeypatch):
     monkeypatch.setattr(rate_limit, "rate_limit_enabled", lambda: True)
     limiter = _AllowLimiter()
     monkeypatch.setattr(rate_limit, "limiter", limiter)
+    db = SimpleNamespace(
+        commits=[],
+        refreshed=[],
+    )
+
+    async def _noop_commit():
+        db.commits.append("commit")
+
+    async def _noop_refresh(obj):
+        db.refreshed.append(obj)
+
+    db.commit = _noop_commit
+    db.refresh = _noop_refresh
     principal = SimpleNamespace(
         sub="sub",
         email="user@example.com",
@@ -85,16 +98,16 @@ async def test_candidate_session_rate_limits(monkeypatch):
     )
 
     await candidate_sessions.resolve_candidate_session(
-        token="x" * 20, request=_fake_request(), principal=principal, db=None
+        token="x" * 20, request=_fake_request(), principal=principal, db=db
     )
     await candidate_sessions.claim_candidate_session(
-        token="x" * 20, request=_fake_request(), db=None, principal=principal
+        token="x" * 20, request=_fake_request(), db=db, principal=principal
     )
     await candidate_sessions.get_current_task(
-        candidate_session_id=1, request=_fake_request(), principal=principal, db=None
+        candidate_session_id=1, request=_fake_request(), principal=principal, db=db
     )
     await candidate_sessions.list_candidate_invites(
-        request=_fake_request(), principal=principal, db=None
+        request=_fake_request(), principal=principal, db=db
     )
 
     assert len(limiter.calls) == 4

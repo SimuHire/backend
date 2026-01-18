@@ -42,8 +42,10 @@ def test_configure_perf_logging_when_enabled(monkeypatch):
     def fake_attach(engine):
         calls["engine"] = engine
 
-    monkeypatch.setattr(api.main, "engine", DummyEngine(), raising=False)
-    monkeypatch.setattr(api.main, "attach_sqlalchemy_listeners", fake_attach, raising=False)
+    monkeypatch.setattr("app.infra.db.engine", DummyEngine(), raising=False)
+    monkeypatch.setattr(
+        "app.infra.perf.attach_sqlalchemy_listeners", fake_attach, raising=False
+    )
 
     class DummyApp:
         def __init__(self):
@@ -54,5 +56,7 @@ def test_configure_perf_logging_when_enabled(monkeypatch):
 
     app_obj = DummyApp()
     api.main._configure_perf_logging(app_obj)
-    assert calls["engine"] is api.main.engine
+    from app.infra import db
+
+    assert calls["engine"] is db.engine
     assert perf.RequestPerfMiddleware in app_obj.middlewares

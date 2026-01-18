@@ -566,6 +566,27 @@ async def test_dispatch_with_fallbacks_and_errors(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_dispatch_with_duplicate_fallbacks_and_all_fail(monkeypatch):
+    class StubClient(GithubClient):
+        def __init__(self):
+            super().__init__(base_url="https://api.github.com", token="x")
+            self.calls = []
+
+        async def trigger_workflow_dispatch(self, repo_full_name, wf, ref, inputs=None):
+            self.calls.append(wf)
+            raise GithubError("missing", status_code=404)
+
+    client = StubClient()
+    runner = GithubActionsRunner(client, workflow_file="preferred.yml")
+    runner._workflow_fallbacks = ["preferred.yml", "preferred.yml"]
+
+    with pytest.raises(GithubError):
+        await runner._dispatch_with_fallbacks("org/repo", ref="main", inputs=None)
+
+    assert client.calls == ["preferred.yml"]
+
+
+@pytest.mark.asyncio
 async def test_build_result_artifact_error_sets_error(monkeypatch):
     runner = GithubActionsRunner(
         GithubClient(base_url="x", token="y"), workflow_file="wf"
@@ -588,6 +609,44 @@ async def test_build_result_artifact_error_sets_error(monkeypatch):
     result = await runner._build_result("org/repo", run)
     assert result.status == "error"
     assert "artifact_error" in result.raw
+
+
+@pytest.mark.asyncio
+async def test_build_result_artifact_error_sets_raw_when_missing(monkeypatch):
+    runner = GithubActionsRunner(
+        GithubClient(base_url="x", token="y"), workflow_file="wf"
+    )
+
+    async def fake_parse(repo, run_id):
+        return None, "artifact_missing"
+
+    monkeypatch.setattr(runner, "_parse_artifacts", fake_parse)
+    original_normalize = runner._normalize_run
+
+    def normalize_with_empty_raw(run, *, timed_out=False, running=False):
+        res = original_normalize(run, timed_out=timed_out, running=running)
+        res.raw = None
+        return res
+
+    monkeypatch.setattr(runner, "_normalize_run", normalize_with_empty_raw)
+    run = WorkflowRun(
+        id=2,
+        status="completed",
+        conclusion="failure",
+        html_url=None,
+        head_sha=None,
+    )
+    result = await runner._build_result("org/repo", run)
+    assert result.raw["artifact_error"] == "artifact_missing"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_with_no_fallbacks(monkeypatch):
+    client = GithubClient(base_url="https://api.github.com", token="t")
+    runner = GithubActionsRunner(client, workflow_file="ci.yml")
+    runner._workflow_fallbacks = []
+    with pytest.raises(GithubError):
+        await runner._dispatch_with_fallbacks("org/repo", ref="main", inputs=None)
 
 
 def test_cache_evictions():

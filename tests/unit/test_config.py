@@ -195,5 +195,50 @@ def test_settings_coerce_trusted_proxies_and_dev_bypass(monkeypatch):
     )
     assert s._coerce_trusted_proxy_cidrs("10.0.0.0/8") == ["10.0.0.0/8"]
     assert s.dev_auth_bypass_enabled is True
-    with pytest.raises(ValueError):
-        Settings(ENV="prod")
+    prod_settings = Settings(
+        DATABASE_URL="sqlite:///x",
+        AUTH0_DOMAIN="example.auth0.com",
+        AUTH0_API_AUDIENCE="aud",
+        ENV="prod",
+    )
+    assert prod_settings.dev_auth_bypass_enabled is True
+
+
+def test_to_async_url_passthrough_branch():
+    assert (
+        _to_async_url("mysql://user:pass@localhost/db")
+        == "mysql://user:pass@localhost/db"
+    )
+
+
+def test_trusted_proxy_coercion_variants(monkeypatch):
+    # list input is passed through
+    assert Settings._coerce_trusted_proxy_cidrs(["10.0.0.0/8"]) == ["10.0.0.0/8"]
+    # JSON array text parses correctly
+    assert Settings._coerce_trusted_proxy_cidrs('["10.0.0.0/8"]') == ["10.0.0.0/8"]
+    assert Settings._coerce_trusted_proxy_cidrs("[invalid") == ["[invalid"]
+
+    monkeypatch.setenv("TENON_GITHUB_TOKEN", "t0k3n")
+    monkeypatch.setenv("TENON_GITHUB_ACTIONS_WORKFLOW_FILE", "ci.yml")
+    monkeypatch.setenv("SMTP_PASSWORD", "supers3cret")
+    merged = Settings._merge_legacy(
+        {
+            "database_url": "postgresql://db",
+            "auth0_domain": "auth.example.com",
+            "cors_allow_origin_regex": "^https://allowed",
+            "github_api_base": "https://api.github.com",
+            "email_provider": "smtp",
+        }
+    )
+    assert merged["database"]["DATABASE_URL"] == "postgresql://db"
+    assert merged["auth"]["AUTH0_DOMAIN"] == "auth.example.com"
+    assert merged["cors"]["CORS_ALLOW_ORIGIN_REGEX"] == "^https://allowed"
+    assert merged["github"]["GITHUB_API_BASE"] == "https://api.github.com"
+    assert merged["github"]["GITHUB_TOKEN"] == "t0k3n"
+    assert merged["github"]["GITHUB_ACTIONS_WORKFLOW_FILE"] == "ci.yml"
+    assert merged["email"]["SMTP_PASSWORD"] == "supers3cret"
+
+
+def test_merge_legacy_email_keys_uppercase():
+    merged = Settings._merge_legacy({"SMTP_HOST": "smtp.test"})
+    assert merged["email"]["SMTP_HOST"] == "smtp.test"

@@ -122,6 +122,155 @@ async def test_fetch_owned_session_expired(async_session):
 
 
 @pytest.mark.asyncio
+async def test_fetch_by_token_for_update_not_found(async_session):
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.fetch_by_token_for_update(async_session, "missing")
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_session_not_found(async_session):
+    principal = _principal("nobody@example.com")
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.fetch_owned_session(async_session, 9999, principal)
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_session_stored_sub_mismatch(async_session):
+    recruiter = await create_recruiter(async_session, email="stored-sub@sim.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+    cs.candidate_auth0_sub = "auth0|other"
+    await async_session.commit()
+
+    principal = _principal(cs.invite_email)
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.fetch_owned_session(async_session, cs.id, principal)
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_session_updates_status(async_session):
+    recruiter = await create_recruiter(async_session, email="promote@sim.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="not_started"
+    )
+    principal = _principal(cs.invite_email)
+    cs.candidate_auth0_sub = principal.sub
+    cs.candidate_email = None
+    await async_session.commit()
+
+    refreshed = await cs_service.fetch_owned_session(async_session, cs.id, principal)
+    assert refreshed.status == "in_progress"
+    assert refreshed.candidate_auth0_email == principal.email
+
+
+class _DummyDB:
+    def __init__(self, cs_for_update):
+        self.cs_for_update = cs_for_update
+
+    def begin_nested(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def commit(self):
+        self.committed = True
+
+    async def refresh(self, obj):
+        self.refreshed = obj
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_session_missing_after_lock(monkeypatch):
+    principal = _principal("lock@test.com")
+    cs_stub = type(
+        "CS",
+        (),
+        {
+            "id": 1,
+            "simulation_id": 1,
+            "candidate_auth0_sub": None,
+            "candidate_email": "lock@test.com",
+            "invite_email": "lock@test.com",
+            "expires_at": None,
+            "status": "not_started",
+        },
+    )()
+
+    async def fake_get_by_id(db, session_id):
+        return cs_stub
+
+    async def fake_get_by_id_for_update(db, session_id):
+        return None
+
+    monkeypatch.setattr(cs_service.cs_repo, "get_by_id", fake_get_by_id)
+    monkeypatch.setattr(
+        cs_service.cs_repo, "get_by_id_for_update", fake_get_by_id_for_update
+    )
+    dummy_db = _DummyDB(None)
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.fetch_owned_session(
+            dummy_db, 1, principal, now=datetime.now(UTC)
+        )
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_fetch_owned_session_conflict_after_lock(monkeypatch):
+    principal = _principal("conflict@test.com")
+    cs_stub = type(
+        "CS",
+        (),
+        {
+            "id": 1,
+            "simulation_id": 1,
+            "candidate_auth0_sub": None,
+            "candidate_email": "conflict@test.com",
+            "invite_email": "conflict@test.com",
+            "expires_at": None,
+            "status": "not_started",
+        },
+    )()
+    conflicting = type(
+        "CS",
+        (),
+        {
+            "id": 1,
+            "simulation_id": 1,
+            "candidate_auth0_sub": "other",
+            "candidate_email": "conflict@test.com",
+            "invite_email": "conflict@test.com",
+            "expires_at": None,
+            "status": "not_started",
+        },
+    )()
+
+    async def fake_get_by_id(db, session_id):
+        return cs_stub
+
+    async def fake_get_by_id_for_update(db, session_id):
+        return conflicting
+
+    monkeypatch.setattr(cs_service.cs_repo, "get_by_id", fake_get_by_id)
+    monkeypatch.setattr(
+        cs_service.cs_repo, "get_by_id_for_update", fake_get_by_id_for_update
+    )
+    dummy_db = _DummyDB(conflicting)
+    with pytest.raises(HTTPException) as excinfo:
+        await cs_service.fetch_owned_session(
+            dummy_db, 1, principal, now=datetime.now(UTC)
+        )
+    assert excinfo.value.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_claim_invite_with_principal(async_session):
     recruiter = await create_recruiter(async_session, email="verify@sim.com")
     sim, _ = await create_simulation(async_session, created_by=recruiter)

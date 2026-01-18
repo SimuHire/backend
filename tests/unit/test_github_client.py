@@ -180,7 +180,15 @@ async def test_github_client_get_bytes_errors():
 @pytest.mark.asyncio
 async def test_github_client_misc_methods(monkeypatch):
     client = GithubClient(base_url="https://api.github.com", token="t")
-    monkeypatch.setattr(client, "_get_json", lambda *a, **k: {})
+
+    async def _fake_get_json(*_a, **_k):
+        return {}
+
+    async def _fake_get_bytes(*_a, **_k):
+        return b"zipdata"
+
+    monkeypatch.setattr(client, "_get_json", _fake_get_json)
+    monkeypatch.setattr(client, "_get_bytes", _fake_get_bytes)
     await client.get_repo("owner/name")
     await client.get_file_contents("owner/name", "path.txt", ref="main")
     await client.get_compare("owner/name", "a", "b")

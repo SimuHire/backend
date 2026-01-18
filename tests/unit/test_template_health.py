@@ -40,17 +40,52 @@ def test_validate_and_decode_helpers():
     )
     assert template_health._validate_test_results_schema({"passed": True}) is False
     assert (
+        template_health._validate_test_results_schema(
+            {"passed": 1, "failed": 0, "total": 1, "stdout": 1, "stderr": ""}
+        )
+        is False
+    )
+    assert (
+        template_health._validate_test_results_schema(
+            {
+                "passed": 1,
+                "failed": 0,
+                "total": 1,
+                "stdout": "",
+                "stderr": "",
+                "summary": "bad",
+            }
+        )
+        is False
+    )
+    assert (
         template_health._decode_contents({"content": "bad", "encoding": "base64"})
         is None
     )
     assert template_health._decode_contents({"content": "plain"}) == "plain"
+    assert template_health._decode_contents({}) is None
+    assert template_health._decode_contents({"content": b"bytes"}) is None
     assert template_health._extract_test_results_json(b"badzip") is None
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{template_health.TEST_ARTIFACT_NAMESPACE}.json", "{not json")
+    assert template_health._extract_test_results_json(buf.getvalue()) is None
     errors, _ = template_health.workflow_contract_errors("missing")
     assert "workflow_missing_upload_artifact" in errors
     assert (
         template_health._classify_github_error(GithubError("x", status_code=403))
         == "github_forbidden"
     )
+    run = WorkflowRun(
+        id=1,
+        status="completed",
+        conclusion="success",
+        html_url="",
+        head_sha="",
+        event="workflow_dispatch",
+        created_at="not-a-date",
+    )
+    assert template_health._is_dispatched_run(run, datetime.now(UTC)) is False
 
 
 class _LiveStubClient(GithubClient):
@@ -80,16 +115,6 @@ class _LiveStubClient(GithubClient):
 
 @pytest.mark.asyncio
 async def test_run_live_check_error_paths():
-    now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-    completed_run = WorkflowRun(
-        id=1,
-        status="completed",
-        conclusion="failure",
-        html_url="",
-        head_sha="",
-        event="workflow_dispatch",
-        created_at=now_iso,
-    )
     client = _LiveStubClient({"dispatch_error": GithubError("deny", status_code=403)})
     result = await template_health._run_live_check(
         client,
@@ -99,6 +124,114 @@ async def test_run_live_check_error_paths():
         timeout_seconds=1,
     )
     assert "github_forbidden" in result.errors
+
+
+def test_extract_test_results_json_non_dict_payload():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            f"{template_health.TEST_ARTIFACT_NAMESPACE}.json",
+            "[]",
+        )
+    assert template_health._extract_test_results_json(buf.getvalue()) is None
+
+
+def test_is_dispatched_run_without_created_at():
+    run = WorkflowRun(
+        id=2,
+        status="completed",
+        conclusion="success",
+        html_url="",
+        head_sha="",
+        event="workflow_dispatch",
+        created_at=None,
+    )
+    assert template_health._is_dispatched_run(run, datetime.now(UTC)) is False
+
+
+@pytest.mark.asyncio
+async def test_template_health_repo_forbidden_classified():
+    class StubGithubClient:
+        async def get_repo(self, repo_full_name: str):
+            raise GithubError("denied", status_code=403)
+
+    response = await check_template_health(
+        StubGithubClient(),
+        workflow_file="tenon-ci.yml",
+        mode="static",
+        template_keys=[next(iter(TEMPLATE_CATALOG))],
+    )
+    assert "github_forbidden" in response.templates[0].errors
+
+
+@pytest.mark.asyncio
+async def test_template_health_workflow_file_rate_limited():
+    class StubGithubClient:
+        async def get_repo(self, repo_full_name: str):
+            return {"default_branch": "main"}
+
+        async def get_branch(self, repo_full_name: str, branch: str):
+            return {"commit": {"sha": "abc"}}
+
+        async def get_file_contents(self, *args, **kwargs):
+            raise GithubError("slow", status_code=429)
+
+    response = await check_template_health(
+        StubGithubClient(),
+        workflow_file="tenon-ci.yml",
+        mode="static",
+        template_keys=[next(iter(TEMPLATE_CATALOG))],
+    )
+    assert "github_rate_limited" in response.templates[0].errors
+
+
+@pytest.mark.asyncio
+async def test_run_live_check_artifact_error_and_expired(monkeypatch):
+    now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    completed_run = WorkflowRun(
+        id=123,
+        status="completed",
+        conclusion="success",
+        html_url="",
+        head_sha="",
+        event="workflow_dispatch",
+        created_at=now_iso,
+    )
+    client = _LiveStubClient(
+        {
+            "runs": [completed_run],
+            "artifact_error": GithubError("rate", status_code=429),
+        }
+    )
+    result = await template_health._run_live_check(
+        client,
+        repo_full_name="org/repo",
+        workflow_file="wf",
+        default_branch="main",
+        timeout_seconds=1,
+    )
+    assert "github_rate_limited" in result.errors
+
+    client = _LiveStubClient(
+        {
+            "runs": [completed_run],
+            "artifacts": [
+                {
+                    "name": template_health.TEST_ARTIFACT_NAMESPACE,
+                    "id": 1,
+                    "expired": True,
+                }
+            ],
+        }
+    )
+    result = await template_health._run_live_check(
+        client,
+        repo_full_name="org/repo",
+        workflow_file="wf",
+        default_branch="main",
+        timeout_seconds=1,
+    )
+    assert "artifact_missing" in result.errors
 
     client = _LiveStubClient({"list_error": GithubError("rate", status_code=429)})
     result = await template_health._run_live_check(
@@ -622,3 +755,72 @@ async def test_live_health_ignores_non_dispatch_event():
     )
     item = response.templates[0]
     assert "workflow_run_timeout" in item.errors
+
+
+@pytest.mark.asyncio
+async def test_template_health_repo_unreachable():
+    class StubGithubClient:
+        async def get_repo(self, repo_full_name: str):
+            raise GithubError("oops")
+
+    response = await check_template_health(
+        StubGithubClient(),
+        workflow_file="tenon-ci.yml",
+        mode="static",
+        template_keys=[next(iter(TEMPLATE_CATALOG))],
+    )
+    assert response.templates[0].errors == ["repo_unreachable"]
+
+
+@pytest.mark.asyncio
+async def test_run_live_check_uncategorized_errors_and_missing_artifacts():
+    now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    completed_run = WorkflowRun(
+        id=99,
+        status="completed",
+        conclusion="success",
+        html_url="",
+        head_sha="",
+        event="workflow_dispatch",
+        created_at=now_iso,
+    )
+    client = _LiveStubClient({"list_error": GithubError("boom")})
+    result = await template_health._run_live_check(
+        client,
+        repo_full_name="org/repo",
+        workflow_file="wf",
+        default_branch="main",
+        timeout_seconds=1,
+    )
+    assert "workflow_dispatch_failed" in result.errors
+
+    client = _LiveStubClient(
+        {
+            "runs": [completed_run],
+            "artifacts": [{"name": template_health.TEST_ARTIFACT_NAMESPACE}],
+        }
+    )
+    result = await template_health._run_live_check(
+        client,
+        repo_full_name="org/repo",
+        workflow_file="wf",
+        default_branch="main",
+        timeout_seconds=1,
+    )
+    assert "artifact_missing" in result.errors
+
+    client = _LiveStubClient(
+        {
+            "runs": [completed_run],
+            "artifacts": [{"name": template_health.TEST_ARTIFACT_NAMESPACE, "id": 5}],
+            "download_error": GithubError("nope", status_code=403),
+        }
+    )
+    result = await template_health._run_live_check(
+        client,
+        repo_full_name="org/repo",
+        workflow_file="wf",
+        default_branch="main",
+        timeout_seconds=1,
+    )
+    assert "github_forbidden" in result.errors

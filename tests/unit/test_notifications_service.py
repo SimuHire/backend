@@ -65,3 +65,35 @@ def test_invite_email_content_and_rate_limit_helpers():
     assert notification_service._rate_limited(None, now, 30) is False
     # _sanitize_error trims length
     assert notification_service._sanitize_error("a" * 300).endswith("a")
+    # _utc_now should attach timezone when missing
+    naive = datetime.now()
+    assert notification_service._utc_now(naive).tzinfo is not None
+    assert notification_service._sanitize_error(None) is None
+
+
+@pytest.mark.asyncio
+async def test_send_invite_email_failure_path(async_session):
+    recruiter = await create_recruiter(async_session, email="notify-fail@test.com")
+    sim, _ = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(async_session, simulation=sim)
+
+    class FailingProvider:
+        async def send(self, message):
+            from app.infra.notifications.email_provider import EmailSendError
+
+            raise EmailSendError("boom")
+
+    email_service = EmailService(FailingProvider(), sender="noreply@test.com")
+
+    result = await notification_service.send_invite_email(
+        async_session,
+        candidate_session=cs,
+        simulation=sim,
+        invite_url=sim_service.invite_url(cs.token),
+        email_service=email_service,
+        now=datetime.now(UTC),
+    )
+    await async_session.refresh(cs)
+    assert result.status == "failed"
+    assert cs.invite_email_status == "failed"
+    assert cs.invite_email_error == "boom"

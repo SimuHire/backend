@@ -75,6 +75,23 @@ async def test_resend_provider_status_error():
 
 
 @pytest.mark.asyncio
+async def test_resend_provider_handles_bad_json():
+    def _handler(_request):
+        return httpx.Response(200, content=b"not-json")
+
+    transport = httpx.MockTransport(_handler)
+    provider = ResendEmailProvider(
+        api_key="key",
+        sender="sender@test.com",
+        transport=transport,
+    )
+    message_id = await provider.send(
+        EmailMessage(to="to@test.com", subject="Hi", text="Body")
+    )
+    assert message_id is None
+
+
+@pytest.mark.asyncio
 async def test_sendgrid_provider_success_with_name():
     def _handler(request):
         payload = json.loads(request.content)
@@ -92,6 +109,26 @@ async def test_sendgrid_provider_success_with_name():
         EmailMessage(to="to@test.com", subject="Hi", text="Body")
     )
     assert message_id == "sg-1"
+
+
+@pytest.mark.asyncio
+async def test_sendgrid_provider_includes_html():
+    def _handler(request):
+        payload = json.loads(request.content)
+        assert len(payload["content"]) == 2
+        assert payload["content"][1]["type"] == "text/html"
+        return httpx.Response(202, headers={"X-Message-Id": "sg-2"})
+
+    transport = httpx.MockTransport(_handler)
+    provider = SendGridEmailProvider(
+        api_key="key",
+        sender="sender@test.com",
+        transport=transport,
+    )
+    message_id = await provider.send(
+        EmailMessage(to="to@test.com", subject="Hi", text="Body", html="<b>Hi</b>")
+    )
+    assert message_id == "sg-2"
 
 
 @pytest.mark.asyncio

@@ -388,3 +388,48 @@ def test_auth_settings_properties_and_algorithms():
     assert obj.issuer.endswith("/")
     assert obj.jwks_url.endswith(".well-known/jwks.json")
     assert obj.algorithms == ["RS256", "HS256"]
+
+
+def test_close_http_client(monkeypatch):
+    closed = {}
+
+    class DummyClient:
+        def close(self):
+            closed["closed"] = True
+
+    monkeypatch.setattr(auth0, "_http_client", DummyClient())
+    auth0._close_http_client()
+    assert closed.get("closed") is True
+
+
+def test_fetch_jwks_uses_http_client(monkeypatch):
+    called = {}
+
+    class DummyResponse:
+        def raise_for_status(self):
+            called["raised"] = True
+
+        def json(self):
+            return {"keys": []}
+
+    class DummyClient:
+        def get(self, url):
+            called["url"] = url
+            return DummyResponse()
+
+    monkeypatch.setattr(auth0, "_http_client", DummyClient())
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_DOMAIN", "tenant.auth0.com")
+    data = auth0._fetch_jwks()
+    assert data["keys"] == []
+    assert called.get("raised") is True
+
+
+def test_get_jwks_returns_cached_inside_lock(monkeypatch):
+    auth0.clear_jwks_cache()
+    auth0._jwks_cache["jwks"] = {"keys": [{"kid": "k1"}]}
+    auth0._jwks_cache["fetched_at"] = 0.0
+    times = iter([5000.0, 0.0])
+    monkeypatch.setattr(auth0.time, "time", lambda: next(times))
+    monkeypatch.setattr(auth0.settings.auth, "AUTH0_JWKS_CACHE_TTL_SECONDS", 3600)
+    jwks = auth0.get_jwks()
+    assert jwks["keys"][0]["kid"] == "k1"

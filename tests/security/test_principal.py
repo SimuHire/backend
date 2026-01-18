@@ -107,3 +107,27 @@ async def test_get_principal_auth0_error_does_not_crash(monkeypatch):
 
     with pytest.raises(auth0.Auth0Error):
         await principal.get_principal(credentials, request)
+
+
+@pytest.mark.asyncio
+async def test_get_principal_maps_jwks_failure(monkeypatch):
+    def bad_decode(_token: str):
+        raise auth0.Auth0Error("Auth provider unavailable", status_code=503)
+
+    monkeypatch.setattr(auth0, "decode_auth0_token", bad_decode)
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
+    request = Request({"type": "http", "headers": []})
+    with pytest.raises(auth0.Auth0Error):
+        await principal.get_principal(credentials, request)
+
+
+@pytest.mark.asyncio
+async def test_get_principal_maps_kid_not_found(monkeypatch):
+    def bad_decode(_token: str):
+        raise auth0.Auth0Error("Signing key not found")
+
+    monkeypatch.setattr(auth0, "decode_auth0_token", bad_decode)
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="tok")
+    request = Request({"type": "http", "headers": []})
+    with pytest.raises(auth0.Auth0Error):
+        await principal.get_principal(credentials, request)

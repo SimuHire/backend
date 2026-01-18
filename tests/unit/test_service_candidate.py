@@ -315,3 +315,48 @@ async def test_ensure_not_duplicate_and_in_order(monkeypatch):
 
     with pytest.raises(HTTPException):
         svc.ensure_in_order(SimpleNamespace(id=2), target_task_id=1)
+
+
+@pytest.mark.asyncio
+async def test_ensure_workspace_reuses_existing(async_session):
+    recruiter = await create_recruiter(async_session, email="reuse@test.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    task = tasks[1]
+
+    existing = await workspace_repo.create_workspace(
+        async_session,
+        candidate_session_id=cs.id,
+        task_id=task.id,
+        template_repo_full_name=task.template_repo,
+        repo_full_name="owner/repo",
+        repo_id=123,
+        default_branch="main",
+        base_template_sha="abc",
+        created_at=datetime.now(UTC),
+    )
+
+    calls = []
+
+    class DummyGithub:
+        async def add_collaborator(self, repo_full_name, username):
+            calls.append((repo_full_name, username))
+
+        async def generate_repo_from_template(self, *a, **k):
+            raise AssertionError("should not generate new repo")
+
+    ws = await svc.ensure_workspace(
+        async_session,
+        candidate_session=cs,
+        task=task,
+        github_client=DummyGithub(),
+        github_username="octocat",
+        repo_prefix="pref-",
+        template_default_owner="owner",
+        now=datetime.now(UTC),
+    )
+
+    assert ws.id == existing.id
+    assert calls == [("owner/repo", "octocat")]
