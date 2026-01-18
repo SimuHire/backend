@@ -119,6 +119,8 @@ def _configure_perf_logging(app: FastAPI) -> None:
     from app.infra.db import engine
     from app.infra.perf import attach_sqlalchemy_listeners
 
+    # Safe to import/attach here: engine is already constructed and this runs once
+    # during app startup, avoiding listener installation when DEBUG_PERF is off.
     attach_sqlalchemy_listeners(engine)
     app.add_middleware(RequestPerfMiddleware)
 

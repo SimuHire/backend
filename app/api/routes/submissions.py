@@ -376,7 +376,11 @@ async def list_submissions(
     )
 
     items: list[RecruiterSubmissionListItemOut] = []
-    for sub, task in rows:
+    for row in rows:
+        if len(row) >= 2:
+            sub, task = row[0], row[1]
+        else:  # pragma: no cover - defensive
+            sub, task = row, None
         parsed_output = recruiter_sub_service.parse_test_output(
             getattr(sub, "test_output", None)
         )

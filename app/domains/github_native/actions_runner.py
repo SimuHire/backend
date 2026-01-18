@@ -106,32 +106,34 @@ class GithubActionsRunner:
         )
 
         deadline = time.monotonic() + self.max_poll_seconds
-        candidate: WorkflowRun | None = None
+        candidate_run: WorkflowRun | None = None
         while time.monotonic() < deadline:
             runs = await self.client.list_workflow_runs(
                 repo_full_name, workflow_file, branch=ref, per_page=5
             )
             for run in runs:
                 if self._is_dispatched_run(run, dispatch_started_at):
-                    candidate = run
+                    candidate_run = run
                     break
-            if candidate:
-                status = (candidate.status or "").lower()
+            if candidate_run:
+                status = (candidate_run.status or "").lower()
                 conclusion = (
-                    (candidate.conclusion or "").lower()
-                    if candidate.conclusion
+                    (candidate_run.conclusion or "").lower()
+                    if candidate_run.conclusion
                     else None
                 )
                 if conclusion or status == "completed":
-                    cache_key = self._run_cache_key(repo_full_name, candidate.id)
-                    result = await self._build_result(repo_full_name, candidate)
+                    run_id = candidate_run.id
+                    cache_key = self._run_cache_key(repo_full_name, run_id)
+                    result = await self._build_result(repo_full_name, candidate_run)
                     self._cache_run_result(cache_key, result)
                     return result
             await asyncio.sleep(self.poll_interval_seconds)
 
-        if candidate:
-            cache_key = self._run_cache_key(repo_full_name, candidate.id)
-            result = self._normalize_run(candidate, running=True)
+        if candidate_run:
+            run_id = candidate_run.id
+            cache_key = self._run_cache_key(repo_full_name, run_id)
+            result = self._normalize_run(candidate_run, running=True)
             self._apply_backoff(cache_key, result)
             self._cache_run_result(cache_key, result)
             return result
@@ -345,7 +347,15 @@ class GithubActionsRunner:
         self._artifact_list_cache[key] = artifacts
         self._artifact_list_cache.move_to_end(key)
         if len(self._artifact_list_cache) > self._max_cache_entries:
-            self._artifact_list_cache.popitem(last=False)
+            evicted_key, _ = self._artifact_list_cache.popitem(last=False)
+            # Clean up any cached artifact bodies for the evicted run to avoid drift.
+            to_remove = [
+                k
+                for k in self._artifact_cache
+                if k[0] == evicted_key[0] and k[1] == evicted_key[1]
+            ]
+            for k in to_remove:
+                self._artifact_cache.pop(k, None)
 
     def _apply_backoff(
         self, key: tuple[str, int], result: ActionsRunResult
@@ -365,6 +375,15 @@ class GithubActionsRunner:
 
     @staticmethod
     def _is_terminal_result(result: ActionsRunResult) -> bool:
+        # "error" is used when we encounter unrecoverable states (missing/corrupt
+        # artifacts or unknown GitHub status); we treat it as terminal to avoid
+        # infinite polling loops.
         if result.conclusion:
             return True
-        return result.status in {"passed", "failed", "cancelled", "timed_out", "error"}
+        return result.status in {
+            "passed",
+            "failed",
+            "cancelled",
+            "timed_out",
+            "error",
+        }
