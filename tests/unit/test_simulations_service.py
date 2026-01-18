@@ -161,6 +161,7 @@ async def test_create_simulation_with_tasks_rejects_bad_template(async_session):
     with pytest.raises(Exception) as excinfo:
         await sim_service.create_simulation_with_tasks(async_session, payload, user)
     assert excinfo.value.status_code == 422
+    assert getattr(excinfo.value, "error_code", None) == "INVALID_TEMPLATE_KEY"
     assert "Invalid templateKey" in str(excinfo.value.detail)
 
 

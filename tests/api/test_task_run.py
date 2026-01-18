@@ -195,7 +195,9 @@ async def test_codespace_init_maps_github_errors_to_502(
         )
 
     assert resp.status_code == 502
-    assert "GitHub credentials" in resp.json()["detail"]
+    body = resp.json()
+    assert body["errorCode"] == "GITHUB_PERMISSION_DENIED"
+    assert "GitHub token" in body["detail"]
 
 
 @pytest.mark.asyncio
@@ -360,7 +362,9 @@ async def test_run_tests_rejects_invalid_branch(
     )
 
     assert resp.status_code == 400
-    assert "branch" in resp.json()["detail"].lower()
+    body = resp.json()
+    assert body["errorCode"] == "INVALID_BRANCH_NAME"
+    assert "branch" in body["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -434,6 +438,22 @@ async def test_run_tests_handles_artifact_missing_status_error(
     data = resp.json()
     assert data["status"] == "error"
     assert "artifact" in (data.get("stderr") or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_validation_error_includes_error_code(
+    async_client, candidate_header_factory
+):
+    headers = candidate_header_factory(
+        candidate_session_id=0, token="candidate:someone@example.com"
+    )
+    resp = await async_client.post(
+        "/api/tasks/1/run", headers=headers, json={"branch": "main"}
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["errorCode"] == "VALIDATION_ERROR"
+    assert isinstance(body["detail"], list)
 
 
 @pytest.mark.asyncio
@@ -522,6 +542,38 @@ async def test_codespace_init_error_includes_error_code_and_sanitizes_tokens(
     combined = json.dumps(body)
     for forbidden in ["Authorization", "Bearer", "ghp_", "eyJ", "Traceback"]:
         assert forbidden not in combined
+
+
+@pytest.mark.asyncio
+async def test_codespace_init_invalid_token_maps_to_specific_error(
+    async_client, async_session, candidate_header_factory, override_dependencies
+):
+    recruiter = await create_recruiter(async_session, email="token@test.com")
+    sim, tasks = await create_simulation(async_session, created_by=recruiter)
+    cs = await create_candidate_session(
+        async_session, simulation=sim, status="in_progress"
+    )
+    await create_submission(
+        async_session, candidate_session=cs, task=tasks[0], content_text="day1"
+    )
+    await async_session.commit()
+
+    class ErrorGithubClient:
+        async def generate_repo_from_template(self, **_kwargs):
+            raise GithubError("bad token", status_code=401)
+
+    with override_dependencies(
+        {candidate_submissions.get_github_client: lambda: ErrorGithubClient()}
+    ):
+        headers = candidate_header_factory(cs)
+        resp = await async_client.post(
+            f"/api/tasks/{tasks[1].id}/codespace/init",
+            headers=headers,
+            json={"githubUsername": "octocat"},
+        )
+
+    assert resp.status_code == 502
+    assert resp.json()["errorCode"] == "GITHUB_TOKEN_INVALID"
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,6 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.error_utils import ApiError
 from app.domains import CandidateSession, Submission, Task
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.github_native.actions_runner import (
@@ -26,6 +25,7 @@ from app.domains.submissions.exceptions import (
     SubmissionOrderError,
 )
 from app.domains.tasks import repository as tasks_repo
+from app.infra.errors import ApiError
 
 TEXT_TASK_TYPES = {"design", "documentation", "handoff"}
 CODE_TASK_TYPES = {"code", "debug"}

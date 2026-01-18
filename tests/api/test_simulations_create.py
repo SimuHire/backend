@@ -186,9 +186,14 @@ async def test_create_simulation_with_invalid_template_key_returns_422(
 
         resp = await async_client.post("/api/simulations", json=payload)
         assert resp.status_code == 422, resp.text
-        detail = resp.json()["detail"][0]["msg"]
-        assert "Invalid templateKey" in detail
-        assert "python-fastapi" in detail
+        body = resp.json()
+        assert body["errorCode"] == "INVALID_TEMPLATE_KEY"
+        detail_list = body["detail"]
+        assert isinstance(detail_list, list)
+        assert any(
+            "Invalid templateKey" in str(item.get("msg")) for item in detail_list
+        )
+        assert "python-fastapi" in body.get("details", {}).get("allowed", [])
 
 
 @pytest.mark.asyncio
