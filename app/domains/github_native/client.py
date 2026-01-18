@@ -201,9 +201,7 @@ class GithubClient:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers=self._headers,
-                timeout=httpx.Timeout(
-                    connect=10.0, read=30.0, write=30.0, pool=10.0
-                ),
+                timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0),
                 limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
                 transport=self.transport,
             )

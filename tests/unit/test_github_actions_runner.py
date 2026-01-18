@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import io
 import json
 import zipfile
+from datetime import UTC, datetime
 
 import pytest
 
@@ -520,6 +520,7 @@ async def test_run_cache_keys_use_run_id(monkeypatch):
 
     client = CountingClient()
     runner = GithubActionsRunner(client, workflow_file="ci.yml")
+
     async def _no_artifacts(repo, run_id):
         return None, None
 

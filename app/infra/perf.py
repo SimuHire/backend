@@ -60,7 +60,7 @@ def attach_sqlalchemy_listeners(engine: AsyncEngine) -> None:
 
     @event.listens_for(sync_engine, "before_cursor_execute")
     def before_cursor_execute(  # type: ignore[no-untyped-def]
-        conn, cursor, statement, parameters, context, executemany
+        _conn, _cursor, _statement, _parameters, context, _executemany
     ):
         if not perf_logging_enabled():
             return
@@ -68,7 +68,7 @@ def attach_sqlalchemy_listeners(engine: AsyncEngine) -> None:
 
     @event.listens_for(sync_engine, "after_cursor_execute")
     def after_cursor_execute(  # type: ignore[no-untyped-def]
-        conn, cursor, statement, parameters, context, executemany
+        _conn, _cursor, _statement, _parameters, context, _executemany
     ):
         if not perf_logging_enabled():
             return
@@ -91,6 +91,7 @@ class RequestPerfMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """ASGI entrypoint for perf logging middleware."""
         if scope.get("type") != "http" or not perf_logging_enabled():
             await self.app(scope, receive, send)
             return
@@ -106,9 +107,7 @@ class RequestPerfMiddleware:
                 status_code = message.get("status", status_code)
                 headers = list(message.get("headers", []))
                 header_name = b"x-request-id"
-                headers = [
-                    (k, v) for (k, v) in headers if k.lower() != header_name
-                ]
+                headers = [(k, v) for (k, v) in headers if k.lower() != header_name]
                 headers.append((header_name, request_id.encode()))
                 message["headers"] = headers
             await send(message)

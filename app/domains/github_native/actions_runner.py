@@ -70,15 +70,13 @@ class GithubActionsRunner:
         self.workflow_file = workflow_file
         self.poll_interval_seconds = poll_interval_seconds
         self.max_poll_seconds = max_poll_seconds
-        self._run_cache: OrderedDict[
-            tuple[str, int], ActionsRunResult
-        ] = OrderedDict()
+        self._run_cache: OrderedDict[tuple[str, int], ActionsRunResult] = OrderedDict()
         self._artifact_cache: OrderedDict[
             tuple[str, int, int], tuple[ParsedTestResults | None, str | None]
         ] = OrderedDict()
-        self._artifact_list_cache: OrderedDict[tuple[str, int], list[dict[str, Any]]] = (
-            OrderedDict()
-        )
+        self._artifact_list_cache: OrderedDict[
+            tuple[str, int], list[dict[str, Any]]
+        ] = OrderedDict()
         self._poll_attempts: dict[tuple[str, int], int] = {}
         self._max_cache_entries = 128
         # Try preferred workflow file first, then Tenon defaults.
@@ -319,9 +317,7 @@ class GithubActionsRunner:
                 return False
         return False
 
-    def _cache_run_result(
-        self, key: tuple[str, int], result: ActionsRunResult
-    ) -> None:
+    def _cache_run_result(self, key: tuple[str, int], result: ActionsRunResult) -> None:
         self._run_cache[key] = result
         self._run_cache.move_to_end(key)
         if len(self._run_cache) > self._max_cache_entries:
@@ -357,9 +353,7 @@ class GithubActionsRunner:
             for k in to_remove:
                 self._artifact_cache.pop(k, None)
 
-    def _apply_backoff(
-        self, key: tuple[str, int], result: ActionsRunResult
-    ) -> None:
+    def _apply_backoff(self, key: tuple[str, int], result: ActionsRunResult) -> None:
         if not self._is_terminal_result(result) and result.status == "running":
             attempt = self._poll_attempts.get(key, 0) + 1
             self._poll_attempts[key] = attempt

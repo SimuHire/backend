@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from contextlib import suppress
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -379,16 +380,8 @@ async def list_submissions(
     for row in rows:
         sub = row
         task = None
-        if isinstance(row, tuple):
-            sub = row[0]
-            task = row[1] if len(row) > 1 else None
-        else:
-            try:
-                sub = row[0]  # type: ignore[index]
-                task = row[1] if hasattr(row, "__len__") and len(row) > 1 else None  # type: ignore[index]
-            except Exception:
-                sub = row
-                task = None
+        with suppress(TypeError, ValueError):
+            sub, task, *_ = row
         parsed_output = recruiter_sub_service.parse_test_output(
             getattr(sub, "test_output", None)
         )
