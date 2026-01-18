@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -22,19 +23,55 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["submissions"])
 
-_MAX_OUTPUT_CHARS = 4000
+_MAX_OUTPUT_CHARS_LIST = 4000
+_MAX_OUTPUT_CHARS_DETAIL = 20000
+
+_TOKEN_REDACT_PATTERNS = [
+    re.compile(r"gh[pous]_[A-Za-z0-9]{10,}", re.IGNORECASE),
+    re.compile(r"github_pat_[A-Za-z0-9_]{10,}", re.IGNORECASE),
+    re.compile(r"(Authorization:\s*Bearer)\s+[^\s]+", re.IGNORECASE),
+    re.compile(r"(token)\s+[A-Za-z0-9_\-]{10,}", re.IGNORECASE),
+]
+_OUTPUT_WHITELIST_KEYS = {
+    "passed",
+    "failed",
+    "total",
+    "stdout",
+    "stderr",
+    "summary",
+    "runId",
+    "run_id",
+    "conclusion",
+    "timeout",
+}
 
 
 def _derive_test_status(passed: int | None, failed: int | None, output) -> str | None:
     return recruiter_sub_service.derive_test_status(passed, failed, output)
 
 
-def _truncate_output(text: str | None) -> str | None:
+def _redact_text(text: str | None) -> str | None:
     if text is None:
         return None
-    if len(text) <= _MAX_OUTPUT_CHARS:
-        return text
-    return text[:_MAX_OUTPUT_CHARS] + "... (truncated)"
+    redacted = text
+    for pattern in _TOKEN_REDACT_PATTERNS:
+        if pattern.groups:
+            redacted = pattern.sub(
+                lambda match: f"{match.group(1)} [redacted]", redacted
+            )
+        else:
+            redacted = pattern.sub("[redacted]", redacted)
+    return redacted
+
+
+def _truncate_output(
+    text: str | None, *, max_chars: int
+) -> tuple[str | None, bool | None]:
+    if text is None:
+        return None, None
+    if len(text) <= max_chars:
+        return text, False
+    return text[:max_chars] + "... (truncated)", True
 
 
 def _safe_int(val) -> int | None:
@@ -50,7 +87,7 @@ def _parse_diff_summary(raw: str | None):
     try:
         return json.loads(raw)
     except ValueError:
-        return raw
+        return None
 
 
 def _build_links(repo_full_name: str | None, commit_sha: str | None, workflow_run_id):
@@ -83,6 +120,8 @@ def _build_test_results(
     *,
     workflow_url: str | None,
     commit_url: str | None,
+    include_output: bool,
+    max_output_chars: int,
 ):
     passed_val = _safe_int(getattr(sub, "tests_passed", None))
     failed_val = _safe_int(getattr(sub, "tests_failed", None))
@@ -96,9 +135,16 @@ def _build_test_results(
     summary = None
     stdout = None
     stderr = None
+    stdout_truncated = None
+    stderr_truncated = None
     sanitized_output = parsed_output
 
+    if isinstance(parsed_output, dict) and not parsed_output:
+        parsed_output = None
+        sanitized_output = None
+
     if isinstance(parsed_output, dict):
+        whitelisted_output = {}
         if passed_val is None:
             passed_val = _safe_int(parsed_output.get("passed"))
         if failed_val is None:
@@ -107,23 +153,42 @@ def _build_test_results(
 
         run_id = parsed_output.get("runId") or parsed_output.get("run_id")
         conclusion_raw = parsed_output.get("conclusion")
-        conclusion = str(conclusion_raw).lower() if conclusion_raw else None
-        timeout = parsed_output.get("timeout") is True or conclusion == "timed_out"
+        conclusion = conclusion or (
+            str(conclusion_raw).lower() if conclusion_raw else None
+        )
+        timeout = timeout or (
+            parsed_output.get("timeout") is True or conclusion == "timed_out"
+        )
         summary_val = parsed_output.get("summary")
         summary = summary_val if isinstance(summary_val, dict) else None
 
         stdout_raw = parsed_output.get("stdout")
         stderr_raw = parsed_output.get("stderr")
-        stdout = _truncate_output(stdout_raw) if isinstance(stdout_raw, str) else None
-        stderr = _truncate_output(stderr_raw) if isinstance(stderr_raw, str) else None
+        if isinstance(stdout_raw, str):
+            stdout_clean = _redact_text(stdout_raw)
+            stdout, stdout_truncated = _truncate_output(
+                stdout_clean, max_chars=max_output_chars
+            )
+        if isinstance(stderr_raw, str):
+            stderr_clean = _redact_text(stderr_raw)
+            stderr, stderr_truncated = _truncate_output(
+                stderr_clean, max_chars=max_output_chars
+            )
 
-        sanitized_output = dict(parsed_output)
+        for key in _OUTPUT_WHITELIST_KEYS:
+            if key in parsed_output:
+                whitelisted_output[key] = parsed_output.get(key)
         if stdout_raw is not None:
-            sanitized_output["stdout"] = stdout
+            whitelisted_output["stdout"] = stdout
         if stderr_raw is not None:
-            sanitized_output["stderr"] = stderr
+            whitelisted_output["stderr"] = stderr
+        sanitized_output = whitelisted_output if include_output else None
     elif isinstance(parsed_output, str):
-        sanitized_output = _truncate_output(parsed_output)
+        redacted = _redact_text(parsed_output)
+        text, truncated = _truncate_output(redacted, max_chars=max_output_chars)
+        sanitized_output = text if include_output else None
+        stdout_truncated = stdout_truncated or truncated
+        stderr_truncated = stderr_truncated or truncated
 
     if total_val is None and (passed_val is not None or failed_val is not None):
         total_val = (passed_val or 0) + (failed_val or 0)
@@ -147,24 +212,46 @@ def _build_test_results(
     ):
         return None
 
-    return {
+    run_status = getattr(sub, "workflow_run_status", None)
+    if isinstance(run_status, str):
+        run_status = run_status.lower()
+    conclusion = getattr(sub, "workflow_run_conclusion", conclusion)
+    if isinstance(conclusion, str):
+        conclusion = conclusion.lower()
+    if run_status is None and isinstance(parsed_output, dict):
+        status_raw = parsed_output.get("status")
+        run_status = str(status_raw).lower() if status_raw else None
+
+    if timeout is None and conclusion == "timed_out":
+        timeout = True
+
+    workflow_run_id_str = str(workflow_run_id) if workflow_run_id is not None else None
+
+    result = {
         "status": status_str,
         "passed": passed_val,
         "failed": failed_val,
         "total": total_val,
         "runId": run_id,
+        "runStatus": run_status,
         "conclusion": conclusion,
         "timeout": timeout,
         "stdout": stdout,
         "stderr": stderr,
+        "stdoutTruncated": stdout_truncated,
+        "stderrTruncated": stderr_truncated,
         "summary": summary,
-        "output": sanitized_output,
         "lastRunAt": last_run_at,
-        "workflowRunId": workflow_run_id,
+        "workflowRunId": workflow_run_id_str,
         "commitSha": commit_sha,
         "workflowUrl": workflow_url,
         "commitUrl": commit_url,
     }
+
+    if include_output:
+        result["output"] = sanitized_output
+
+    return result
 
 
 @router.get("/{submission_id}", response_model=RecruiterSubmissionDetailOut)
@@ -206,7 +293,12 @@ async def get_submission_detail(
     )
     diff_url = _build_diff_url(repo_full_name, diff_summary)
     test_results = _build_test_results(
-        sub, parsed_output, workflow_url=workflow_url, commit_url=commit_url
+        sub,
+        parsed_output,
+        workflow_url=workflow_url,
+        commit_url=commit_url,
+        include_output=True,
+        max_output_chars=_MAX_OUTPUT_CHARS_DETAIL,
     )
 
     return RecruiterSubmissionDetailOut(
@@ -240,7 +332,11 @@ async def get_submission_detail(
     )
 
 
-@router.get("", response_model=RecruiterSubmissionListOut)
+@router.get(
+    "",
+    response_model=RecruiterSubmissionListOut,
+    response_model_exclude={"items": {"__all__": {"testResults": {"output"}}}},
+)
 async def list_submissions(
     db: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[User, Depends(get_current_user)],
@@ -270,7 +366,12 @@ async def list_submissions(
         )
         diff_url = _build_diff_url(repo_full_name, diff_summary)
         test_results = _build_test_results(
-            sub, parsed_output, workflow_url=workflow_url, commit_url=commit_url
+            sub,
+            parsed_output,
+            workflow_url=workflow_url,
+            commit_url=commit_url,
+            include_output=False,
+            max_output_chars=_MAX_OUTPUT_CHARS_LIST,
         )
 
         items.append(

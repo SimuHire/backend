@@ -89,7 +89,7 @@ async def test_list_submissions_handles_bad_json(monkeypatch):
     result = await recruiter_submissions.list_submissions(
         db=None, user=user, candidateSessionId=None, taskId=None
     )
-    assert result.items[0].diffSummary == "{not-json"
+    assert result.items[0].diffSummary is None
     assert result.items[0].repoUrl is None
 
 
@@ -129,7 +129,7 @@ async def test_recruiter_detail_handles_invalid_diff(monkeypatch):
     result = await recruiter_submissions.get_submission_detail(
         submission_id=sub.id, db=None, user=user
     )
-    assert result.diffSummary == "{bad"
+    assert result.diffSummary is None
     assert result.diffUrl is None
 
 

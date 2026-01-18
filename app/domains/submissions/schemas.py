@@ -114,11 +114,14 @@ class RecruiterTestResultsOut(APIModel):
     failed: int | None = None
     total: int | None = None
     runId: int | str | None = None
+    runStatus: str | None = None
     conclusion: str | None = None
     timeout: bool | None = None
     stdout: str | None = None
     stderr: str | None = None
     summary: dict[str, object] | None = None
+    stdoutTruncated: bool | None = None
+    stderrTruncated: bool | None = None
     output: dict[str, object] | str | None = None
     lastRunAt: datetime | None = None
     workflowRunId: str | None = None
