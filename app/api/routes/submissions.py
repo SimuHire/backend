@@ -231,7 +231,7 @@ def _build_test_results(
     workflow_run_id_str = str(workflow_run_id) if workflow_run_id is not None else None
 
     artifact_present = (
-        sanitized_output is not None
+        parsed_output is not None
         or passed_val is not None
         or failed_val is not None
         or total_val is not None

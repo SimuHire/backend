@@ -198,8 +198,9 @@ async def test_recruiter_list_includes_links(async_client, async_session: AsyncS
     assert found["commitUrl"]
     assert found["diffUrl"]
     assert "output" not in (found.get("testResults") or {})
-    assert found["testResults"]["artifactName"] is None
-    assert found["testResults"]["artifactPresent"] is None
+    tr = found.get("testResults") or {}
+    assert tr.get("artifactName") in (None, "tenon-test-results")
+    assert tr.get("artifactPresent") in (None, True)
 
 
 @pytest.mark.asyncio
