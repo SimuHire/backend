@@ -227,8 +227,6 @@ class Settings(BaseSettings):
     email: EmailSettings = Field(default_factory=EmailSettings)
 
     CANDIDATE_PORTAL_BASE_URL: str = ""
-    CANDIDATE_CONNECTION_NAME: str = ""
-    RECRUITER_CONNECTION_NAME: str = ""
     ADMIN_API_KEY: str = ""
 
     @field_validator("TRUSTED_PROXY_CIDRS", mode="before")

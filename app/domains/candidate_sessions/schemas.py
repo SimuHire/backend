@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import EmailStr, Field
 
 from app.domains.common.base import APIModel
+from app.domains.common.progress import ProgressSummary
 from app.domains.common.types import CandidateSessionStatus
 from app.domains.tasks.schemas_public import TaskPublic
 
@@ -55,13 +56,6 @@ class CandidateSessionResolveResponse(APIModel):
     completedAt: datetime | None
     candidateName: str
     simulation: CandidateSimulationSummary
-
-
-class ProgressSummary(APIModel):
-    """Summary of progress for the candidate session."""
-
-    completed: int
-    total: int
 
 
 class CandidateInviteListItem(APIModel):

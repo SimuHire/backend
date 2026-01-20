@@ -292,10 +292,9 @@ def _raise_for_status(url: str, resp: httpx.Response) -> None:
         extra={
             "url": url,
             "status_code": resp.status_code,
-            "body": resp.text[:500],
         },
     )
     raise GithubError(
-        f"GitHub API error ({resp.status_code}) ({url}) ({resp.text[:500]})",
+        f"GitHub API error ({resp.status_code}) ({url})",
         status_code=resp.status_code,
     )

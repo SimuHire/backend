@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.infra.security import rate_limit
 
-RATE_LIMIT_RULES = {
+_DEFAULT_RATE_LIMIT_RULES = {
     "init": rate_limit.RateLimitRule(limit=20, window_seconds=30.0),
     "run": rate_limit.RateLimitRule(limit=20, window_seconds=30.0),
     "poll": rate_limit.RateLimitRule(limit=15, window_seconds=30.0),
@@ -15,13 +15,18 @@ POLL_MIN_INTERVAL_SECONDS = 2.0
 RUN_CONCURRENCY_LIMIT = 1
 
 
+def _rule_for(action: str) -> rate_limit.RateLimitRule:
+    return _DEFAULT_RATE_LIMIT_RULES.get(
+        action, rate_limit.RateLimitRule(limit=5, window_seconds=30.0)
+    )
+
+
 def apply_rate_limit(candidate_session_id: int, action: str) -> None:
     """Enforce rate limits per candidate action bucket."""
     if not rate_limit.rate_limit_enabled():
         return
-    rule = RATE_LIMIT_RULES.get(action, rate_limit.RateLimitRule(5, 30.0))
     key = rate_limit.rate_limit_key("tasks", str(candidate_session_id), action)
-    rate_limit.limiter.allow(key, rule)
+    rate_limit.limiter.allow(key, _rule_for(action))
 
 
 def throttle_poll(candidate_session_id: int, run_id: int) -> None:
