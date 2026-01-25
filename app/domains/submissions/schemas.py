@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.domains.common.base import APIModel
+from app.domains.common.progress import ProgressSummary
 
 
 class SubmissionCreateRequest(BaseModel):
@@ -69,13 +70,6 @@ class CodespaceStatusResponse(APIModel):
     lastWorkflowConclusion: str | None = None
     lastTestSummary: dict[str, Any] | None = None
     workspaceId: str
-
-
-class ProgressSummary(APIModel):
-    """Schema for summarizing progress."""
-
-    completed: int
-    total: int
 
 
 class SubmissionCreateResponse(APIModel):

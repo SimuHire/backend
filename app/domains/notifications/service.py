@@ -1,118 +1,21 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from app.domains.notifications.invite_content import sanitize_error as _sanitize_error
+from app.domains.notifications.invite_send import send_invite_email
+from app.domains.notifications.invite_time import (
+    INVITE_EMAIL_RATE_LIMIT_SECONDS,
+)
+from app.domains.notifications.invite_time import (
+    rate_limited as _rate_limited,
+)
+from app.domains.notifications.invite_time import (
+    utc_now as _utc_now,
+)
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core.brand import APP_NAME
-from app.domains import CandidateSession, Simulation
-from app.services.email import EmailSendResult, EmailService
-
-INVITE_EMAIL_RATE_LIMIT_SECONDS = 30
-
-
-def _utc_now(now: datetime | None) -> datetime:
-    resolved = now or datetime.now(UTC)
-    if resolved.tzinfo is None:
-        return resolved.replace(tzinfo=UTC)
-    return resolved
-
-
-def _rate_limited(
-    last_attempt: datetime | None, now: datetime, window_seconds: int
-) -> bool:
-    if last_attempt is None:
-        return False
-    last = last_attempt
-    if last.tzinfo is None:
-        last = last.replace(tzinfo=UTC)
-    return (now - last).total_seconds() < window_seconds
-
-
-def _sanitize_error(err: str | None) -> str | None:
-    if not err:
-        return None
-    return err[:200]
-
-
-def _invite_email_content(
-    *,
-    candidate_name: str,
-    invite_url: str,
-    simulation: Simulation,
-    expires_at: datetime | None,
-) -> tuple[str, str, str]:
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    expires_text = (
-        expires_at.astimezone(UTC).strftime("%Y-%m-%d") if expires_at else "soon"
-    )
-    subject = f"You're invited: {simulation.title}"
-    text = (
-        f"Hi {candidate_name},\n\n"
-        f"You've been invited to complete the {simulation.role} simulation in {APP_NAME}.\n"
-        f"Simulation: {simulation.title}\n"
-        f"Role: {simulation.role}\n\n"
-        f"Start here: {invite_url}\n\n"
-        f"Your invite expires on {expires_text}. "
-        "If you did not expect this email, you can ignore it."
-    )
-    html = (
-        f"<p>Hi {candidate_name},</p>"
-        f"<p>You have been invited to complete the <strong>{simulation.role}</strong> simulation in {APP_NAME}.</p>"
-        f"<p><strong>Simulation:</strong> {simulation.title}<br>"
-        f"<strong>Role:</strong> {simulation.role}</p>"
-        f'<p><a href="{invite_url}">Open your invite</a></p>'
-        f"<p>This invite expires on {expires_text}.</p>"
-    )
-    return subject, text, html
-
-
-async def send_invite_email(
-    db: AsyncSession,
-    *,
-    candidate_session: CandidateSession,
-    simulation: Simulation,
-    invite_url: str,
-    email_service: EmailService,
-    now: datetime | None = None,
-) -> EmailSendResult:
-    """Send an invite email and persist delivery status."""
-    now = _utc_now(now)
-    if _rate_limited(
-        candidate_session.invite_email_last_attempt_at,
-        now,
-        INVITE_EMAIL_RATE_LIMIT_SECONDS,
-    ):
-        candidate_session.invite_email_status = "rate_limited"
-        candidate_session.invite_email_last_attempt_at = now
-        candidate_session.invite_email_error = "Rate limited"
-        await db.commit()
-        await db.refresh(candidate_session)
-        return EmailSendResult(status="rate_limited", error="Rate limited")
-
-    subject, text, html = _invite_email_content(
-        candidate_name=candidate_session.candidate_name,
-        invite_url=invite_url,
-        simulation=simulation,
-        expires_at=candidate_session.expires_at,
-    )
-    result = await email_service.send_email(
-        to=candidate_session.invite_email,
-        subject=subject,
-        text=text,
-        html=html,
-    )
-
-    candidate_session.invite_email_last_attempt_at = now
-    if result.status == "sent":
-        candidate_session.invite_email_status = "sent"
-        candidate_session.invite_email_sent_at = now
-        candidate_session.invite_email_error = None
-    else:
-        candidate_session.invite_email_status = result.status
-        candidate_session.invite_email_error = _sanitize_error(result.error)
-
-    await db.commit()
-    await db.refresh(candidate_session)
-    return result
+__all__ = [
+    "send_invite_email",
+    "INVITE_EMAIL_RATE_LIMIT_SECONDS",
+    "_rate_limited",
+    "_utc_now",
+    "_sanitize_error",
+]

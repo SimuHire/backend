@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+
+def build_result_kwargs(
+    *,
+    status_str,
+    passed_val,
+    failed_val,
+    total_val,
+    run_id,
+    run_status,
+    conclusion,
+    timeout,
+    payload,
+    last_run_at,
+    workflow_run_id_str,
+    commit_sha,
+    workflow_url,
+    commit_url,
+    include_output: bool,
+):
+    artifact_present = payload["parsed_payload_present"]
+    return {
+        "status_str": status_str,
+        "passed_val": passed_val,
+        "failed_val": failed_val,
+        "total_val": total_val,
+        "run_id": run_id,
+        "run_status": run_status,
+        "conclusion": conclusion,
+        "timeout": timeout,
+        "stdout": payload["stdout"],
+        "stderr": payload["stderr"],
+        "stdout_truncated": payload["stdout_truncated"],
+        "stderr_truncated": payload["stderr_truncated"],
+        "summary": payload["summary"],
+        "last_run_at": last_run_at,
+        "workflow_run_id_str": workflow_run_id_str,
+        "commit_sha": commit_sha,
+        "workflow_url": workflow_url,
+        "commit_url": commit_url,
+        "artifact_present": artifact_present,
+        "artifact_error": payload["artifact_error"],
+        "sanitized_output": payload["sanitized_output"],
+        "include_output": include_output,
+    }

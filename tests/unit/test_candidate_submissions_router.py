@@ -112,10 +112,12 @@ async def test_init_codespace_success_path(monkeypatch, async_session):
         lambda *a, **k: None,
     )
 
-    async def _return_current(*_a, **_k):
-        return task
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
 
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
+    monkeypatch.setattr(
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
+    )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
         "ensure_workspace",
@@ -171,10 +173,12 @@ async def test_init_codespace_normalizes_legacy_url(monkeypatch, async_session):
         lambda *a, **k: None,
     )
 
-    async def _return_current(*_a, **_k):
-        return task
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
 
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
+    monkeypatch.setattr(
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
+    )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
         "ensure_workspace",
@@ -229,10 +233,12 @@ async def test_init_codespace_missing_repo_full_name(monkeypatch, async_session)
         lambda *a, **k: None,
     )
 
-    async def _return_current(*_a, **_k):
-        return task
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
 
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
+    monkeypatch.setattr(
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
+    )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
         "ensure_workspace",
@@ -282,8 +288,13 @@ async def test_init_codespace_maps_github_error(monkeypatch, async_session):
         "validate_run_allowed",
         lambda *a, **k: None,
     )
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
+
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
+
+    monkeypatch.setattr(
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
+    )
 
     async def _raise_workspace(*_a, **_kw):
         raise GithubError("boom")
@@ -585,13 +596,17 @@ async def test_submit_task_code_path(monkeypatch, async_session):
     _return_workspace_obj = _async_return(workspace)
     _return_result = _async_return(result)
     _record_result = _async_return(workspace)
-    _return_current = _async_return(task)
 
     monkeypatch.setattr(
         candidate_submissions, "_rate_limit_or_429", lambda *_a, **_k: None
     )
-    monkeypatch.setattr(candidate_submissions, "_compute_current_task", _return_current)
-    candidate_submissions._compute_current_task = _return_current
+
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
+
+    monkeypatch.setattr(
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
+    )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
         "load_task_or_404",
@@ -944,8 +959,12 @@ async def test_submit_task_missing_workspace(monkeypatch, async_session):
         "ensure_in_order",
         lambda *_a, **_k: None,
     )
+
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
+
     monkeypatch.setattr(
-        candidate_submissions, "_compute_current_task", _async_return(task)
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
     )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
@@ -989,8 +1008,12 @@ async def test_submit_task_github_error(monkeypatch, async_session):
     cs = _stub_cs()
     task = _stub_task()
     workspace = _stub_workspace()
+
+    async def _return_snapshot(*_a, **_k):
+        return ([], set(), task, 0, 1, False)
+
     monkeypatch.setattr(
-        candidate_submissions, "_compute_current_task", _async_return(task)
+        candidate_submissions.cs_service, "progress_snapshot", _return_snapshot
     )
     monkeypatch.setattr(
         candidate_submissions.submission_service,
