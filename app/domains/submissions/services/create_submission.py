@@ -1,7 +1,4 @@
 from __future__ import annotations
-
-# NOTE: Slightly over 50 LOC to keep submission persistence and conflict handling together.
-import json
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
@@ -11,6 +8,8 @@ from app.domains import CandidateSession, Submission, Task
 from app.domains.github_native.actions_runner import ActionsRunResult
 from app.domains.github_native.workspaces.workspace import Workspace
 from app.domains.submissions.exceptions import SubmissionConflict
+from app.domains.submissions.services.submission_actions import derive_actions_metadata
+from app.domains.submissions.services.submission_builder import build_submission
 
 
 async def create_submission(
@@ -25,29 +24,15 @@ async def create_submission(
     diff_summary_json: str | None = None,
 ) -> Submission:
     """Persist a submission with conflict handling."""
-    tests_passed = tests_failed = last_run_at = commit_sha = workflow_run_id = None
-    test_output = None
-    if actions_result is not None:
-        tests_passed = actions_result.passed
-        tests_failed = actions_result.failed
-        test_output = json.dumps(actions_result.as_test_output, ensure_ascii=False)
-        last_run_at = now
-        commit_sha = actions_result.head_sha
-        workflow_run_id = str(actions_result.run_id)
-
-    sub = Submission(
-        candidate_session_id=candidate_session.id,
-        task_id=task.id,
-        submitted_at=now,
-        content_text=payload.contentText,
-        code_repo_path=workspace.repo_full_name if workspace else None,
-        commit_sha=commit_sha,
-        workflow_run_id=workflow_run_id,
+    actions_meta = derive_actions_metadata(actions_result, now)
+    sub = build_submission(
+        candidate_session=candidate_session,
+        task=task,
+        payload=payload,
+        now=now,
+        workspace=workspace,
         diff_summary_json=diff_summary_json,
-        tests_passed=tests_passed,
-        tests_failed=tests_failed,
-        test_output=test_output,
-        last_run_at=last_run_at,
+        **actions_meta,
     )
     db.add(sub)
     try:

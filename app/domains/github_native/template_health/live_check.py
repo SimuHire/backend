@@ -1,21 +1,11 @@
 from __future__ import annotations
 
-# NOTE: This file exceeds 50 LOC to keep live workflow dispatch/poll/artifact validation together.
-from dataclasses import dataclass
-
 from app.domains.github_native import GithubClient
 from app.domains.github_native.template_health.live_artifacts import (
     collect_artifact_status,
 )
 from app.domains.github_native.template_health.live_dispatch import dispatch_and_poll
-
-
-@dataclass
-class _LiveCheckResult:
-    errors: list[str]
-    workflow_run_id: int | None
-    workflow_conclusion: str | None
-    artifact_name_found: str | None
+from app.domains.github_native.template_health.live_result import LiveCheckResult
 
 
 async def _run_live_check(
@@ -25,7 +15,7 @@ async def _run_live_check(
     workflow_file: str,
     default_branch: str,
     timeout_seconds: int,
-) -> _LiveCheckResult:
+) -> LiveCheckResult:
     errors, workflow_run_id, workflow_conclusion = await dispatch_and_poll(
         github_client,
         repo_full_name=repo_full_name,
@@ -34,7 +24,7 @@ async def _run_live_check(
         timeout_seconds=timeout_seconds,
     )
     if errors or workflow_run_id is None:
-        return _LiveCheckResult(
+        return LiveCheckResult(
             errors or ["workflow_run_timeout"],
             workflow_run_id,
             workflow_conclusion,
@@ -49,7 +39,7 @@ async def _run_live_check(
     if workflow_conclusion and workflow_conclusion != "success":
         artifact_errors.append("workflow_run_not_success")
 
-    return _LiveCheckResult(
+    return LiveCheckResult(
         artifact_errors,
         workflow_run_id,
         workflow_conclusion,
