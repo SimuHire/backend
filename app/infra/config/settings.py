@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-# NOTE: Settings stay centralized while feature-scoped configs are introduced.
+# This module intentionally exceeds 50 LOC: keeping one Pydantic BaseSettings
+# class preserves env parsing/back-compat shims without scattering validators.
 import os
 
 from pydantic import AliasChoices, Field, field_validator, model_validator

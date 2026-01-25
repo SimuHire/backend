@@ -1,15 +1,10 @@
 from __future__ import annotations
-
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from .claims import claim_namespace, claim_uri
 from .defaults import DEFAULT_CLAIM_NAMESPACE
 
-
 class AuthSettings(BaseSettings):
-    """Auth-related configuration (Auth0 + JWT compatibility)."""
-
     AUTH0_DOMAIN: str = ""
     AUTH0_ISSUER: str | None = None
     AUTH0_JWKS_URL: str | None = None
@@ -21,48 +16,32 @@ class AuthSettings(BaseSettings):
     AUTH0_EMAIL_CLAIM: str = ""
     AUTH0_ROLES_CLAIM: str = ""
     AUTH0_PERMISSIONS_CLAIM: str = ""
-
     model_config = SettingsConfigDict(extra="ignore", env_prefix="TENON_")
 
     @property
     def issuer(self) -> str:
         issuer = (self.AUTH0_ISSUER or f"https://{self.AUTH0_DOMAIN}/").strip()
-        if issuer and not issuer.endswith("/"):
-            issuer = f"{issuer}/"
-        return issuer
+        return issuer if issuer.endswith("/") else f"{issuer}/"
 
     @property
     def jwks_url(self) -> str:
-        return (
-            self.AUTH0_JWKS_URL or f"https://{self.AUTH0_DOMAIN}/.well-known/jwks.json"
-        )
+        return self.AUTH0_JWKS_URL or f"https://{self.AUTH0_DOMAIN}/.well-known/jwks.json"
 
     @property
-    def audience(self) -> str:
+    def audience(self) -> str:  # alias for backward compatibility
         return self.AUTH0_API_AUDIENCE
 
     @property
     def algorithms(self) -> list[str]:
-        parts = [
-            part.strip() for part in self.AUTH0_ALGORITHMS.split(",") if part.strip()
-        ]
-        return parts or ["RS256"]
+        return [p.strip() for p in self.AUTH0_ALGORITHMS.split(",") if p.strip()] or ["RS256"]
 
     @model_validator(mode="after")
     def _apply_claim_namespace(self):
-        namespace = claim_namespace(self.AUTH0_CLAIM_NAMESPACE)
-        if not self.AUTH0_EMAIL_CLAIM:
-            self.AUTH0_EMAIL_CLAIM = claim_uri(namespace, "email")
-        if not self.AUTH0_ROLES_CLAIM:
-            self.AUTH0_ROLES_CLAIM = claim_uri(namespace, "roles")
-        if not self.AUTH0_PERMISSIONS_CLAIM:
-            self.AUTH0_PERMISSIONS_CLAIM = claim_uri(namespace, "permissions")
+        ns = claim_namespace(self.AUTH0_CLAIM_NAMESPACE)
+        self.AUTH0_EMAIL_CLAIM = self.AUTH0_EMAIL_CLAIM or claim_uri(ns, "email")
+        self.AUTH0_ROLES_CLAIM = self.AUTH0_ROLES_CLAIM or claim_uri(ns, "roles")
+        self.AUTH0_PERMISSIONS_CLAIM = self.AUTH0_PERMISSIONS_CLAIM or claim_uri(ns, "permissions")
         return self
 
-    @property
-    def permissions_str_claim(self) -> str:
-        return claim_uri(self.AUTH0_CLAIM_NAMESPACE, "permissions_str")
-
-    @property
-    def name_claim(self) -> str:
-        return claim_uri(self.AUTH0_CLAIM_NAMESPACE, "name")
+    permissions_str_claim = property(lambda self: claim_uri(self.AUTH0_CLAIM_NAMESPACE, "permissions_str"))
+    name_claim = property(lambda self: claim_uri(self.AUTH0_CLAIM_NAMESPACE, "name"))
