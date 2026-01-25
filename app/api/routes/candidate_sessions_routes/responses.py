@@ -5,7 +5,6 @@ from app.domains.candidate_sessions.schemas import (
     ProgressSummary,
 )
 from app.domains.tasks.schemas_public import TaskPublic
-from app.api.routes.candidate_sessions_routes.time_utils import utcnow
 
 
 def render_claim_response(cs) -> CandidateSessionResolveResponse:

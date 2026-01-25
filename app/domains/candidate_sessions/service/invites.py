@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domains import Task
 from app.domains.candidate_sessions import repository as cs_repo
 from app.domains.candidate_sessions.schemas import CandidateInviteListItem
-from app.domains.candidate_sessions.service.invite_items import build_invite_item, last_submission_map
+from app.domains.candidate_sessions.service.invite_items import (
+    build_invite_item,
+    last_submission_map,
+)
 from app.infra.security.principal import Principal
 
 

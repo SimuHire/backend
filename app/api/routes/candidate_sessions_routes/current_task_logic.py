@@ -3,7 +3,9 @@
 from app.api.routes.candidate_sessions_routes.rate_limits import (
     CANDIDATE_CURRENT_TASK_RATE_LIMIT,
 )
-from app.api.routes.candidate_sessions_routes.responses import build_current_task_response
+from app.api.routes.candidate_sessions_routes.responses import (
+    build_current_task_response,
+)
 from app.api.routes.candidate_sessions_routes.time_utils import utcnow
 from app.domains.candidate_sessions import service as cs_service
 from app.infra.security import rate_limit

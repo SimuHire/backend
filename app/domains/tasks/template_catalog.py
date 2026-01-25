@@ -29,7 +29,9 @@ def resolve_template_repo_full_name(template_key: str) -> str:
     return TEMPLATE_CATALOG[key]["repo_full_name"]
 
 
-def normalize_template_repo_value(template_repo: str | None, *, template_key: str | None = None) -> str | None:
+def normalize_template_repo_value(
+    template_repo: str | None, *, template_key: str | None = None
+) -> str | None:
     template_repo = (template_repo or "").strip()
     validated_key: str | None = None
     if template_key:
@@ -39,7 +41,11 @@ def normalize_template_repo_value(template_repo: str | None, *, template_key: st
             validated_key = None
     default_repo = resolve_template_repo_full_name(DEFAULT_TEMPLATE_KEY)
     if template_repo in LEGACY_TEMPLATE_REPO_REWRITES:
-        return resolve_template_repo_full_name(validated_key) if validated_key else default_repo
+        return (
+            resolve_template_repo_full_name(validated_key)
+            if validated_key
+            else default_repo
+        )
     if template_repo:
         return template_repo
     if validated_key:

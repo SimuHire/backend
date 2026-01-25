@@ -19,4 +19,12 @@ def enrich_run_info(sub, run_id, conclusion, timeout):
     if timeout is None and conclusion == "timed_out":
         timeout = True
     workflow_run_id_str = str(workflow_run_id) if workflow_run_id is not None else None
-    return run_id, conclusion, timeout, run_status, workflow_run_id_str, commit_sha, last_run_at
+    return (
+        run_id,
+        conclusion,
+        timeout,
+        run_status,
+        workflow_run_id_str,
+        commit_sha,
+        last_run_at,
+    )

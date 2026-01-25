@@ -1,5 +1,6 @@
 from contextlib import suppress
 
+from app.api.routes.submissions_helpers_guard import ensure_recruiter_guard
 from app.domains.submissions import service_recruiter as recruiter_sub_service
 from app.domains.submissions.presenter import present_detail, present_list_item
 from app.domains.submissions.schemas import (
@@ -7,7 +8,6 @@ from app.domains.submissions.schemas import (
     RecruiterSubmissionListItemOut,
     RecruiterSubmissionListOut,
 )
-from app.api.routes.submissions_helpers_guard import ensure_recruiter_guard
 
 
 async def get_submission_detail(

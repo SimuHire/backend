@@ -6,11 +6,14 @@ from app.domains.submissions.presenter.detail_payload import (
     build_task_payload,
 )
 from app.domains.submissions.presenter.links import build_diff_url, build_links
-from app.domains.submissions.presenter.output import max_output_chars, parse_diff_summary
+from app.domains.submissions.presenter.output import (
+    max_output_chars,
+    parse_diff_summary,
+)
 from app.domains.submissions.presenter.test_results import build_test_results
 
 
-def present_detail(sub, task, cs, sim):
+def present_detail(sub, task, cs, _sim):
     parsed_output = recruiter_sub_service.parse_test_output(
         getattr(sub, "test_output", None)
     )

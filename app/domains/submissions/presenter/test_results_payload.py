@@ -3,7 +3,9 @@ from __future__ import annotations
 from app.domains.submissions.presenter.parsed_output import process_parsed_output
 
 
-def extract_payload(parsed_payload, *, include_output: bool, max_output_chars: int) -> dict:
+def extract_payload(
+    parsed_payload, *, include_output: bool, max_output_chars: int
+) -> dict:
     (
         passed_val,
         failed_val,

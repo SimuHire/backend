@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
+
 from app.infra.config import settings
+
 from .email_claims import extract_email
 from .selectors import first_claim
 

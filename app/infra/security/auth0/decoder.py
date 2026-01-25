@@ -1,15 +1,30 @@
 from __future__ import annotations
+
 import logging
 from typing import Any
+
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
+
 from app.infra.config import settings
+
 from .errors import Auth0Error
 
 logger = logging.getLogger(__name__)
 
+
 def _log_failure(reason: str, *, kid: str | None, alg: str | None) -> None:
-    logger.warning("auth0_token_validation_failed", extra={"reason": reason, "kid": kid, "alg": alg, "iss": settings.auth.issuer, "aud": settings.auth.audience})
+    logger.warning(
+        "auth0_token_validation_failed",
+        extra={
+            "reason": reason,
+            "kid": kid,
+            "alg": alg,
+            "iss": settings.auth.issuer,
+            "aud": settings.auth.audience,
+        },
+    )
+
 
 def decode_auth0_token(token: str) -> dict[str, Any]:
     try:
@@ -27,6 +42,7 @@ def decode_auth0_token(token: str) -> dict[str, Any]:
         _log_failure("invalid_algorithm", kid=kid, alg=alg)
         raise Auth0Error("Invalid token algorithm")
     from app.infra.security import auth0
+
     jwks = auth0.get_jwks()
     key = next((jwk for jwk in jwks.get("keys", []) if jwk.get("kid") == kid), None)
     if key is None:
@@ -37,12 +53,23 @@ def decode_auth0_token(token: str) -> dict[str, Any]:
             _log_failure("kid_not_found", kid=kid, alg=alg)
             raise Auth0Error("Signing key not found")
     try:
-        return jwt.decode(token, key, algorithms=settings.auth.algorithms, audience=settings.auth.audience, issuer=settings.auth.issuer, options={"verify_at_hash": False, "leeway": settings.auth.AUTH0_LEEWAY_SECONDS})
+        return jwt.decode(
+            token,
+            key,
+            algorithms=settings.auth.algorithms,
+            audience=settings.auth.audience,
+            issuer=settings.auth.issuer,
+            options={
+                "verify_at_hash": False,
+                "leeway": settings.auth.AUTH0_LEEWAY_SECONDS,
+            },
+        )
     except ExpiredSignatureError as exc:
         _log_failure("expired", kid=kid, alg=alg)
         raise Auth0Error("Token expired") from exc
     except JWTError as exc:
         _log_failure("invalid_token", kid=kid, alg=alg)
         raise Auth0Error("Invalid token") from exc
+
 
 __all__ = ["decode_auth0_token", "_log_failure"]

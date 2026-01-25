@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 from fastapi.security import HTTPAuthorizationCredentials
+
 from .builder import build_principal
 from .model import Principal
+
 
 def build_dev_principal(credentials: HTTPAuthorizationCredentials) -> Principal | None:
     token = credentials.credentials or ""
@@ -19,5 +22,6 @@ def build_dev_principal(credentials: HTTPAuthorizationCredentials) -> Principal 
         "name": email,
     }
     return build_principal(claims)
+
 
 __all__ = ["build_dev_principal"]

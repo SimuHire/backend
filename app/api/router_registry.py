@@ -23,7 +23,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         candidate_sessions.router, prefix=f"{prefix}/candidate", tags=["candidate"]
     )
-    app.include_router(tasks_codespaces.router, prefix=f"{prefix}/tasks", tags=["tasks"])
+    app.include_router(
+        tasks_codespaces.router, prefix=f"{prefix}/tasks", tags=["tasks"]
+    )
     app.include_router(submissions.router, prefix=f"{prefix}")
 
 

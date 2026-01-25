@@ -1,10 +1,7 @@
 """Compatibility wrappers for error handling (kept slim for legacy imports)."""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 
 from app.api.errors.mappers import map_github_error
 from app.api.errors.response import api_error_handler
@@ -17,4 +14,9 @@ def register_error_handlers(app) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
 
 
-__all__ = ["api_error_handler", "register_error_handlers", "map_github_error", "validation_error_handler"]
+__all__ = [
+    "api_error_handler",
+    "register_error_handlers",
+    "map_github_error",
+    "validation_error_handler",
+]
