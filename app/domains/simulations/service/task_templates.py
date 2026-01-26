@@ -1,1 +1,1 @@
-from app.services.simulations.task_templates import *
+from app.services.simulations.task_templates import *  # noqa: F403

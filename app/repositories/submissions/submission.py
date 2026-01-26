@@ -19,12 +19,18 @@ class Submission(Base):
 
     __tablename__ = "submissions"
     __table_args__ = (
-        UniqueConstraint("candidate_session_id", "task_id", name="uq_submissions_candidate_session_task"),
+        UniqueConstraint(
+            "candidate_session_id",
+            "task_id",
+            name="uq_submissions_candidate_session_task",
+        ),
         Index("ix_submissions_candidate_session_id", "candidate_session_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    candidate_session_id: Mapped[int] = mapped_column(ForeignKey("candidate_sessions.id"))
+    candidate_session_id: Mapped[int] = mapped_column(
+        ForeignKey("candidate_sessions.id")
+    )
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     content_text: Mapped[str | None] = mapped_column(Text)
@@ -35,7 +41,9 @@ class Submission(Base):
     tests_passed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tests_failed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     test_output: Mapped[str | None] = mapped_column(Text, nullable=True)
-    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     candidate_session = relationship("CandidateSession", back_populates="submissions")
     task = relationship("Task", back_populates="submissions")

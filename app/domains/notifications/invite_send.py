@@ -1,1 +1,1 @@
-from app.services.notifications.invite_send import *
+from app.services.notifications.invite_send import *  # noqa: F403

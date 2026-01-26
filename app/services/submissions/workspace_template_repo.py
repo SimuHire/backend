@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 
 from app.domains import CandidateSession, Task
-from app.domains.submissions.services.repo_naming import (
+from app.integrations.github.client import GithubClient
+from app.services.submissions.repo_naming import (
     build_repo_name,
     validate_repo_full_name,
 )
-from app.integrations.github.client import GithubClient
 
 
 async def generate_template_repo(

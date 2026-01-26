@@ -1,1 +1,1 @@
-from app.repositories.github_native.workspaces.repository import *
+from app.repositories.github_native.workspaces.repository import *  # noqa: F403

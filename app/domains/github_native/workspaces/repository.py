@@ -1,1 +1,1 @@
-from app.integrations.github.workspaces.repository import *
+from app.integrations.github.workspaces.repository import *  # noqa: F403

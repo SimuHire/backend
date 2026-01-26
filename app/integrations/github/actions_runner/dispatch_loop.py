@@ -16,15 +16,25 @@ async def dispatch_and_wait(
     ctx: RunnerContext, *, repo_full_name: str, ref: str, inputs: dict[str, Any] | None
 ) -> Any:
     dispatch_started_at = datetime.now(UTC)
-    workflow_file = await ctx._dispatch_with_fallbacks(repo_full_name, ref=ref, inputs=inputs)
+    workflow_file = await ctx._dispatch_with_fallbacks(
+        repo_full_name, ref=ref, inputs=inputs
+    )
     deadline = asyncio.get_event_loop().time() + ctx.max_poll_seconds
     candidate_run = None
     while asyncio.get_event_loop().time() < deadline:
-        runs = await ctx.client.list_workflow_runs(repo_full_name, workflow_file, branch=ref, per_page=5)
-        candidate_run = next((run for run in runs if is_dispatched_run(run, dispatch_started_at)), None)
+        runs = await ctx.client.list_workflow_runs(
+            repo_full_name, workflow_file, branch=ref, per_page=5
+        )
+        candidate_run = next(
+            (run for run in runs if is_dispatched_run(run, dispatch_started_at)), None
+        )
         if candidate_run:
             status = (candidate_run.status or "").lower()
-            conclusion = (candidate_run.conclusion or "").lower() if candidate_run.conclusion else None
+            conclusion = (
+                (candidate_run.conclusion or "").lower()
+                if candidate_run.conclusion
+                else None
+            )
             if conclusion or status == "completed":
                 cache_key = run_cache_key(repo_full_name, candidate_run.id)
                 result = await build_result(ctx, repo_full_name, candidate_run)

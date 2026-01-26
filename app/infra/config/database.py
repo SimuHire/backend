@@ -1,1 +1,1 @@
-from app.core.settings.database import *
+from app.core.settings.database import *  # noqa: F403

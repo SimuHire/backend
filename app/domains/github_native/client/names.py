@@ -1,1 +1,1 @@
-from app.integrations.github.client.names import *
+from app.integrations.github.client.names import *  # noqa: F403

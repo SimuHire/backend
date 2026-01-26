@@ -1,1 +1,1 @@
-from app.services.candidate_sessions.ownership import *
+from app.services.candidate_sessions.ownership import *  # noqa: F403

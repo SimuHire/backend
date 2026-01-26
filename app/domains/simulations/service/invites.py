@@ -1,1 +1,1 @@
-from app.services.simulations.invites import *
+from app.services.simulations.invites import *  # noqa: F403

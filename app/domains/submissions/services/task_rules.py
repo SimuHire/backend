@@ -1,1 +1,1 @@
-from app.services.submissions.task_rules import *
+from app.services.submissions.task_rules import *  # noqa: F403

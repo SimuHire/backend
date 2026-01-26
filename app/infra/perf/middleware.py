@@ -1,1 +1,1 @@
-from app.core.perf.middleware import *
+from app.core.perf.middleware import *  # noqa: F403

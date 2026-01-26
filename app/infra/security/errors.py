@@ -1,1 +1,1 @@
-from app.core.auth.errors import *
+from app.core.auth.errors import *  # noqa: F403

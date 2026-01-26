@@ -1,1 +1,1 @@
-from app.core.perf.sqlalchemy_hooks import *
+from app.core.perf.sqlalchemy_hooks import *  # noqa: F403

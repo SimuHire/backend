@@ -1,1 +1,1 @@
-from app.core.settings.cors import *
+from app.core.settings.cors import *  # noqa: F403

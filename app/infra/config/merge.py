@@ -1,1 +1,1 @@
-from app.core.settings.merge import *
+from app.core.settings.merge import *  # noqa: F403

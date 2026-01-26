@@ -1,1 +1,1 @@
-from app.services.simulations.ownership import *
+from app.services.simulations.ownership import *  # noqa: F403

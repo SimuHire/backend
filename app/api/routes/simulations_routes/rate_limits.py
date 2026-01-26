@@ -1,1 +1,1 @@
-from app.api.routers.simulations_routes.rate_limits import *
+from app.api.routers.simulations_routes.rate_limits import *  # noqa: F403

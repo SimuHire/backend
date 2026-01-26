@@ -1,1 +1,1 @@
-from app.integrations.notifications.email_provider.base import *
+from app.integrations.notifications.email_provider.base import *  # noqa: F403

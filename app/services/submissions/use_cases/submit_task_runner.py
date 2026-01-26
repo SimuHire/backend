@@ -4,9 +4,9 @@ from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ApiError
+from app.domains.submissions import service_candidate as submission_service
 from app.integrations.github.client import GithubClient, GithubError
 from app.repositories.github_native.workspaces.models import Workspace
-from app.services.submissions import service_candidate as submission_service
 from app.services.submissions.run_service import ActionsRunResult
 from app.services.submissions.use_cases.submit_diff import build_diff_summary
 from app.services.submissions.use_cases.submit_workspace import (
@@ -43,4 +43,9 @@ async def run_code_submission(
     except GithubError:
         raise
     except Exception as exc:  # pragma: no cover - safety net
-        raise ApiError(status_code=status.HTTP_502_BAD_GATEWAY, detail="GitHub unavailable. Please try again.", error_code="GITHUB_UNAVAILABLE", retryable=True) from exc
+        raise ApiError(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="GitHub unavailable. Please try again.",
+            error_code="GITHUB_UNAVAILABLE",
+            retryable=True,
+        ) from exc

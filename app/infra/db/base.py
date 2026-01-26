@@ -1,1 +1,1 @@
-from app.core.db.base import *
+from app.core.db.base import *  # noqa: F403

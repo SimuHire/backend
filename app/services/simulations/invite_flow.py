@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.candidate_sessions import repository as cs_repo
 from app.domains.candidate_sessions.schemas import CandidateInviteRequest
 from app.domains.common.types import CANDIDATE_SESSION_STATUS_COMPLETED
 
@@ -23,7 +22,9 @@ async def create_or_resend_invite(
     now = now or datetime.now(UTC)
     invite_email = str(payload.inviteEmail).strip().lower()
 
-    existing = await cs_repo.get_by_simulation_and_email_for_update(
+    from app.domains.simulations import service as sim_service
+
+    existing = await sim_service.cs_repo.get_by_simulation_and_email_for_update(
         db, simulation_id=simulation_id, invite_email=invite_email
     )
     if existing:

@@ -1,1 +1,1 @@
-from app.services.simulations.urls import *
+from app.services.simulations.urls import *  # noqa: F403

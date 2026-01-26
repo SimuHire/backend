@@ -1,1 +1,1 @@
-from app.schemas.submissions import *
+from app.schemas.submissions import *  # noqa: F403

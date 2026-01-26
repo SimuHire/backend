@@ -22,7 +22,10 @@ async def request_json(
     try:
         resp = await transport.client().request(method, path, params=params, json=json)
     except httpx.HTTPError as exc:  # pragma: no cover - network
-        logger.error("github_request_failed", extra={"url": f"{transport.base_url}{path}", "error": str(exc)})
+        logger.error(
+            "github_request_failed",
+            extra={"url": f"{transport.base_url}{path}", "error": str(exc)},
+        )
         raise GithubError("GitHub request failed") from exc
 
     raise_for_status(str(resp.url), resp)
@@ -36,11 +39,16 @@ async def request_json(
         raise GithubError("Invalid GitHub response") from exc
 
 
-async def get_bytes(transport: GithubTransport, path: str, params: dict | None = None) -> bytes:
+async def get_bytes(
+    transport: GithubTransport, path: str, params: dict | None = None
+) -> bytes:
     try:
         resp = await transport.client().get(path, params=params, follow_redirects=True)
     except httpx.HTTPError as exc:  # pragma: no cover - network
-        logger.error("github_request_failed", extra={"url": f"{transport.base_url}{path}", "error": str(exc)})
+        logger.error(
+            "github_request_failed",
+            extra={"url": f"{transport.base_url}{path}", "error": str(exc)},
+        )
         raise GithubError("GitHub request failed") from exc
 
     raise_for_status(str(resp.url), resp)

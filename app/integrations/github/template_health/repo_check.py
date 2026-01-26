@@ -40,4 +40,13 @@ async def check_template_repo(
         )
         errors.extend(live.errors)
         live_result = live
-    return build_repo_result(template_key, repo_full_name, workflow_file, checks, errors, mode, default_branch, live_result)
+    return build_repo_result(
+        template_key,
+        repo_full_name,
+        workflow_file,
+        checks,
+        errors,
+        mode,
+        default_branch,
+        live_result,
+    )

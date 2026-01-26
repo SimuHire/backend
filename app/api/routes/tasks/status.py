@@ -1,1 +1,1 @@
-from app.api.routers.tasks.status import *
+from app.api.routers.tasks.status import *  # noqa: F403

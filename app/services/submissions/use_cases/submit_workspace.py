@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.submissions import service_candidate as submission_service
 from app.domains.submissions.exceptions import WorkspaceMissing
-from app.domains.submissions.services.workspace_records import Workspace
+from app.repositories.github_native.workspaces.models import Workspace
 
 
 async def fetch_workspace_and_branch(

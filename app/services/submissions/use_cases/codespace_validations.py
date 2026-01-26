@@ -3,8 +3,8 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession
-from app.services import candidate_sessions as cs_service
-from app.services.submissions import service_candidate as submission_service
+from app.domains.candidate_sessions import service as cs_service
+from app.domains.submissions import service_candidate as submission_service
 
 
 async def validate_codespace_request(

@@ -1,1 +1,1 @@
-from app.core.auth.dependencies.users import *
+from app.core.auth.dependencies.users import *  # noqa: F403

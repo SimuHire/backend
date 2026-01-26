@@ -4,7 +4,6 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Task
-from app.domains.submissions import repository as submissions_repo
 from app.domains.submissions.exceptions import (
     SimulationComplete,
     SubmissionConflict,
@@ -24,7 +23,9 @@ async def ensure_not_duplicate(
     db: AsyncSession, candidate_session_id: int, task_id: int
 ) -> None:
     """Guard against duplicate submissions for a task."""
-    if await submissions_repo.find_duplicate(db, candidate_session_id, task_id):
+    from app.domains.submissions import service_candidate as svc
+
+    if await svc.submissions_repo.find_duplicate(db, candidate_session_id, task_id):
         raise SubmissionConflict()
 
 

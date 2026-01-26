@@ -1,1 +1,1 @@
-from app.core.settings.email import *
+from app.core.settings.email import *  # noqa: F403

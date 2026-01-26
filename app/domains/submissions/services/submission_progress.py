@@ -1,1 +1,1 @@
-from app.services.submissions.submission_progress import *
+from app.services.submissions.submission_progress import *  # noqa: F403

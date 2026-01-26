@@ -1,1 +1,1 @@
-from app.api.routers.simulations_routes.detail_render import *
+from app.api.routers.simulations_routes.detail_render import *  # noqa: F403

@@ -1,1 +1,1 @@
-from app.api.routers.auth import *
+from app.api.routers.auth import *  # noqa: F403

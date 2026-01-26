@@ -1,1 +1,1 @@
-from app.core.logging.configure import *
+from app.core.logging.configure import *  # noqa: F403

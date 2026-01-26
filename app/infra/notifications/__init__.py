@@ -1,1 +1,1 @@
-from app.integrations.notifications.__init__ import *
+from app.integrations.notifications.__init__ import *  # noqa: F403

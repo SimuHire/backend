@@ -1,1 +1,1 @@
-from app.integrations.github.client.content import *
+from app.integrations.github.client.content import *  # noqa: F403

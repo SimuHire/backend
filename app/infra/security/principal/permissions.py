@@ -1,1 +1,1 @@
-from app.core.auth.principal.permissions import *
+from app.core.auth.principal.permissions import *  # noqa: F403

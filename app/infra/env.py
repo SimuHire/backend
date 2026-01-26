@@ -1,1 +1,1 @@
-from app.core.env import *
+from app.core.env import *  # noqa: F403

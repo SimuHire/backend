@@ -1,1 +1,1 @@
-from app.repositories.simulations.repository_owned import *
+from app.repositories.simulations.repository_owned import *  # noqa: F403

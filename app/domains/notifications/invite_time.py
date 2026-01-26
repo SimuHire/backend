@@ -1,1 +1,1 @@
-from app.services.notifications.invite_time import *
+from app.services.notifications.invite_time import *  # noqa: F403

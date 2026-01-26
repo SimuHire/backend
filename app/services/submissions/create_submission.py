@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Submission, Task
 from app.domains.submissions.exceptions import SubmissionConflict
-from app.domains.submissions.services.submission_actions import derive_actions_metadata
-from app.domains.submissions.services.submission_builder import build_submission
 from app.integrations.github.actions_runner import ActionsRunResult
 from app.integrations.github.workspaces.workspace import Workspace
+from app.services.submissions.submission_actions import derive_actions_metadata
+from app.services.submissions.submission_builder import build_submission
 
 
 async def create_submission(

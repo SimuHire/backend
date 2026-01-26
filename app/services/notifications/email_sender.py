@@ -25,7 +25,9 @@ class EmailSender:
         for attempt in range(self.max_attempts):
             try:
                 message_id = await self.provider.send(
-                    EmailMessage(to=to, subject=subject, text=text, html=html, sender=self.sender)
+                    EmailMessage(
+                        to=to, subject=subject, text=text, html=html, sender=self.sender
+                    )
                 )
                 return EmailSendResult(status="sent", message_id=message_id)
             except EmailSendError as exc:

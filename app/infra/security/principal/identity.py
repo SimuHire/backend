@@ -1,1 +1,1 @@
-from app.core.auth.principal.identity import *
+from app.core.auth.principal.identity import *  # noqa: F403

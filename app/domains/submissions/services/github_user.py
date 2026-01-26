@@ -1,1 +1,1 @@
-from app.services.submissions.github_user import *
+from app.services.submissions.github_user import *  # noqa: F403

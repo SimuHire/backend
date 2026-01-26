@@ -1,1 +1,1 @@
-from app.core.auth.roles import *
+from app.core.auth.roles import *  # noqa: F403

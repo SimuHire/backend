@@ -1,1 +1,1 @@
-from app.api.routers.health import *
+from app.api.routers.health import *  # noqa: F403

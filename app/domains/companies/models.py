@@ -1,1 +1,1 @@
-from app.repositories.companies.models import *
+from app.repositories.companies.models import *  # noqa: F403

@@ -22,7 +22,14 @@ def _build_std_email(message: EmailMessage, sender: str) -> StdEmailMessage:
     return email
 
 
-def _send_sync(email: StdEmailMessage, host: str, port: int, username: str, password: str, use_tls: bool):
+def _send_sync(
+    email: StdEmailMessage,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    use_tls: bool,
+):
     with smtplib.SMTP(host, port, timeout=10) as server:
         server.ehlo()
         if use_tls:
@@ -44,7 +51,9 @@ async def send_smtp(
 ) -> None:
     email = _build_std_email(message, sender or username)
     try:
-        await asyncio.to_thread(_send_sync, email, host, port, username, password, use_tls)
+        await asyncio.to_thread(
+            _send_sync, email, host, port, username, password, use_tls
+        )
     except Exception as exc:  # pragma: no cover - network
         logger.error("email_send_failed", extra={"provider": "smtp", "error": str(exc)})
         raise EmailSendError("SMTP send failed") from exc

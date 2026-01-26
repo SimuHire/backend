@@ -1,1 +1,1 @@
-from app.repositories.submissions.repository import *
+from app.repositories.submissions.repository import *  # noqa: F403

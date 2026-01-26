@@ -1,1 +1,1 @@
-from app.integrations.github.actions_runner.runs import *
+from app.integrations.github.actions_runner.runs import *  # noqa: F403

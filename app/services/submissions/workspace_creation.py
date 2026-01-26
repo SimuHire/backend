@@ -24,7 +24,12 @@ async def provision_workspace(
     template_default_owner: str | None,
     now: datetime,
 ) -> Workspace:
-    template_repo, repo_full_name, default_branch, repo_id = await generate_template_repo(
+    (
+        template_repo,
+        repo_full_name,
+        default_branch,
+        repo_id,
+    ) = await generate_template_repo(
         github_client=github_client,
         candidate_session=candidate_session,
         task=task,

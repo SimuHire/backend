@@ -1,1 +1,1 @@
-from app.core.auth.auth0.decoder import *
+from app.core.auth.auth0.decoder import *  # noqa: F403

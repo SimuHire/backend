@@ -1,1 +1,1 @@
-from app.core.settings.parsers import *
+from app.core.settings.parsers import *  # noqa: F403

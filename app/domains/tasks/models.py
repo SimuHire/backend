@@ -1,1 +1,1 @@
-from app.repositories.tasks.models import *
+from app.repositories.tasks.models import *  # noqa: F403

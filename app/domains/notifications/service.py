@@ -1,1 +1,1 @@
-from app.services.notifications.service import *
+from app.services.notifications.service import *  # noqa: F403
