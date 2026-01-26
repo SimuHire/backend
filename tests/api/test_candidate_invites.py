@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes import simulations as sim_routes
+from app.api.routers import simulations as sim_routes
+from app.core.settings import settings
 from app.domains import CandidateSession, Company, User
 from app.domains.common.types import CANDIDATE_SESSION_STATUS_COMPLETED
-from app.infra.config import settings
 
 
 async def seed_recruiter(

@@ -2,10 +2,10 @@ import asyncio
 
 from sqlalchemy import select
 
+from app.core.db import async_session_maker, engine
 from app.domains import Base
-from app.domains.companies.models import Company
-from app.domains.users.models import User
-from app.infra.db import async_session_maker, engine
+from app.repositories.companies.models import Company
+from app.repositories.users.models import User
 
 
 async def main():

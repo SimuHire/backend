@@ -14,7 +14,7 @@ from app.api.middleware import (
 )
 from app.api.router_registry import register_routers
 from app.core.brand import APP_NAME
-from app.infra.config import settings
+from app.core.settings import settings
 
 
 def create_app() -> FastAPI:

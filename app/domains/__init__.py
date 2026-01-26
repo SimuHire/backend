@@ -1,12 +1,12 @@
-from app.domains.candidate_sessions.models import CandidateSession
-from app.domains.companies.models import Company
-from app.domains.github_native.workspaces.workspace import Workspace
-from app.domains.simulations.simulation import Simulation
-from app.domains.submissions.fit_profile import FitProfile
-from app.domains.submissions.submission import Submission
-from app.domains.tasks.models import Task
-from app.domains.users.models import User
-from app.infra.db.base import Base, TimestampMixin
+from app.core.db.base import Base, TimestampMixin
+from app.repositories.candidate_sessions.models import CandidateSession
+from app.repositories.companies.models import Company
+from app.repositories.github_native.workspaces.models import Workspace
+from app.repositories.simulations.simulation import Simulation
+from app.repositories.submissions.fit_profile import FitProfile
+from app.repositories.submissions.submission import Submission
+from app.repositories.tasks.models import Task
+from app.repositories.users.models import User
 
 __all__ = [
     "Base",

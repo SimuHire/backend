@@ -4,9 +4,9 @@ import io
 from datetime import UTC, datetime, timedelta
 from zipfile import ZipFile
 
-from app.domains.github_native.actions_runner import GithubActionsRunner
-from app.domains.github_native.artifacts import parse_test_results_zip
-from app.domains.github_native.client import GithubClient, WorkflowRun
+from app.integrations.github.actions_runner import GithubActionsRunner
+from app.integrations.github.artifacts import parse_test_results_zip
+from app.integrations.github.client import GithubClient, WorkflowRun
 
 
 def test_parse_test_results_prefers_json():

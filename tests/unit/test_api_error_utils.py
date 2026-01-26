@@ -4,7 +4,7 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 
 from app.api import error_utils
-from app.domains.github_native.client import GithubError
+from app.integrations.github.client import GithubError
 
 
 def test_api_error_handler_includes_details():

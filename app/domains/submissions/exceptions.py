@@ -1,6 +1,6 @@
 from fastapi import status
 
-from app.infra.errors import ApiError
+from app.core.errors import ApiError
 
 
 class SubmissionConflict(ApiError):

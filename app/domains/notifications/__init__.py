@@ -1,1 +1,1 @@
-"""Notification domain helpers (email delivery, templates)."""
+from app.services.notifications.__init__ import *  # noqa: F403

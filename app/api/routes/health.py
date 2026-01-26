@@ -1,9 +1,1 @@
-from fastapi import APIRouter
-
-router = APIRouter()
-
-
-@router.get("/health")
-async def health_check():
-    """Liveness probe endpoint."""
-    return {"status": "ok"}
+from app.api.routers.health import *  # noqa: F403

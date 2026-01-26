@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.infra.env import env_name
+from app.core.env import env_name
 
 
 def _parse_csv(value: str | None) -> list[str]:

@@ -4,8 +4,8 @@ from sqlalchemy import engine_from_config, pool
 
 import app.domains  # noqa: F401  # ensure models are imported for metadata
 from alembic import context
-from app.infra.config import settings
-from app.infra.db.base import Base
+from app.core.db.base import Base
+from app.core.settings import settings
 
 config = context.config
 

@@ -1,7 +1,7 @@
 import pytest
 
-from app.infra.security import candidate_access
-from app.infra.security.principal import Principal
+from app.core.auth import candidate_access
+from app.core.auth.principal import Principal
 
 
 @pytest.mark.asyncio

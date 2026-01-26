@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes import simulations as recruiter_sims
+from app.api.routers import simulations as recruiter_sims
 
 
 def _request(host: str = "127.0.0.1"):

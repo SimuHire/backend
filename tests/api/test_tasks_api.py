@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import delete, select
 
 from app.domains import Submission, Task
-from app.domains.github_native.actions_runner import ActionsRunResult
+from app.integrations.github.actions_runner import ActionsRunResult
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

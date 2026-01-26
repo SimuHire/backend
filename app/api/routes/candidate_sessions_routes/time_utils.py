@@ -1,10 +1,1 @@
-from __future__ import annotations
-
-from datetime import UTC, datetime
-
-
-def utcnow():
-    return datetime.now(UTC)
-
-
-__all__ = ["utcnow"]
+from app.api.routers.candidate_sessions_routes.time_utils import *  # noqa: F403

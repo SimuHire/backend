@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi.responses import JSONResponse
 
-from app.infra.errors import ApiError
+from app.core.errors import ApiError
 
 
 def api_error_handler(_request, exc: ApiError) -> JSONResponse:

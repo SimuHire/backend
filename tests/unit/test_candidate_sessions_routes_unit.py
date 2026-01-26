@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import pytest
 from fastapi import Request
 
-from app.api.routes import candidate_sessions
-from app.infra.security import rate_limit
+from app.api.routers import candidate_sessions
+from app.core.auth import rate_limit
 
 
 def _fake_request(scope_overrides: dict | None = None) -> Request:

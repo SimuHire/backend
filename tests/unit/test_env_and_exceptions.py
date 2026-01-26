@@ -1,6 +1,6 @@
+from app.core import env
+from app.core.settings import settings
 from app.domains.submissions import exceptions
-from app.infra import env
-from app.infra.config import settings
 
 
 def test_env_helpers_local(monkeypatch):

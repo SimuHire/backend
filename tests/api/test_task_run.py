@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import select
 
-from app.api.routes import tasks_codespaces as candidate_submissions
-from app.domains.github_native.actions_runner import ActionsRunResult
-from app.domains.github_native.client import GithubError
-from app.domains.github_native.workspaces import repository as workspace_repo
-from app.domains.github_native.workspaces.workspace import Workspace
+from app.api.routers import tasks_codespaces as candidate_submissions
+from app.integrations.github.actions_runner import ActionsRunResult
+from app.integrations.github.client import GithubError
+from app.integrations.github.workspaces import repository as workspace_repo
+from app.integrations.github.workspaces.workspace import Workspace
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

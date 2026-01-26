@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.infra.config import settings
-from app.infra.proxy_headers import TrustedProxyHeadersMiddleware, trusted_proxy_cidrs
-from app.infra.request_limits import RequestSizeLimitMiddleware
+from app.core.proxy_headers import TrustedProxyHeadersMiddleware, trusted_proxy_cidrs
+from app.core.request_limits import RequestSizeLimitMiddleware
+from app.core.settings import settings
 
 
 def configure_proxy_headers(app: FastAPI) -> None:

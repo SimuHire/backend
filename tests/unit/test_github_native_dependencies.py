@@ -1,5 +1,5 @@
 from app.api.dependencies import github_native
-from app.domains.github_native.client import GithubClient
+from app.integrations.github.client import GithubClient
 
 
 def test_actions_runner_singleton_reused_and_custom_client_gets_new_runner():

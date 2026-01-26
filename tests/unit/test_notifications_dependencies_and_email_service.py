@@ -1,7 +1,7 @@
 import pytest
 
 from app.api.dependencies import notifications
-from app.infra.notifications.email_provider import (
+from app.integrations.notifications.email_provider import (
     ConsoleEmailProvider,
     EmailSendError,
     ResendEmailProvider,

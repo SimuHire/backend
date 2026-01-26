@@ -1,7 +1,7 @@
 import logging
 
-from app.infra import logging as logging_mod
-from app.infra.logging import configure_logging
+from app.core import logging as logging_mod
+from app.core.logging import configure_logging
 
 
 def test_log_redaction_masks_bearer_token(caplog):

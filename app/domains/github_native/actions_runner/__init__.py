@@ -1,4 +1,1 @@
-from app.domains.github_native.actions_runner.models import ActionsRunResult, RunStatus
-from app.domains.github_native.actions_runner.runner import GithubActionsRunner
-
-__all__ = ["ActionsRunResult", "RunStatus", "GithubActionsRunner"]
+from app.integrations.github.actions_runner.__init__ import *  # noqa: F403

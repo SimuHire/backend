@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Company, Simulation, Submission, Task, User
 from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
-from app.domains.tasks.template_catalog import (
+from app.services.tasks.template_catalog import (
     DEFAULT_TEMPLATE_KEY,
     resolve_template_repo_full_name,
 )

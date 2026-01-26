@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI, Request
 from httpx import AsyncByteStream, AsyncClient
 
-from app.infra.request_limits import RequestSizeLimitMiddleware
+from app.core.request_limits import RequestSizeLimitMiddleware
 
 
 class ChunkStream(AsyncByteStream):

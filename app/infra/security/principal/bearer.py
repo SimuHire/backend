@@ -1,5 +1,1 @@
-from __future__ import annotations
-
-from fastapi.security import HTTPBearer
-
-bearer_scheme = HTTPBearer(auto_error=False)
+from app.core.auth.principal.bearer import *  # noqa: F403

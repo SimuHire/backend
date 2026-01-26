@@ -1,3 +1,1 @@
-from app.domains.github_native.workspaces.workspace import Workspace
-
-__all__ = ["Workspace"]
+from app.integrations.github.workspaces.__init__ import *  # noqa: F403

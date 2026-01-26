@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.routes import submissions
+from app.api.routers import submissions
 from tests.factories import create_recruiter
 
 

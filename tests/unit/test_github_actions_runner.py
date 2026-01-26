@@ -7,12 +7,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.domains.github_native.actions_runner import (
+from app.integrations.github.actions_runner import (
     ActionsRunResult,
     GithubActionsRunner,
 )
-from app.domains.github_native.artifacts import ParsedTestResults
-from app.domains.github_native.client import (
+from app.integrations.github.artifacts import ParsedTestResults
+from app.integrations.github.client import (
     GithubClient,
     GithubError,
     WorkflowRun,

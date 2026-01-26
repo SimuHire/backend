@@ -1,6 +1,6 @@
 import pytest
 
-from app.infra.config import CorsSettings, Settings, _to_async_url
+from app.core.settings import CorsSettings, Settings, _to_async_url
 
 
 def test_database_url_sync_normalizes_postgres_scheme():
@@ -144,7 +144,7 @@ def test_merge_env_applies_nested_values(monkeypatch):
 
 
 def test_normalize_sync_url_passthrough():
-    from app.infra.config import _normalize_sync_url
+    from app.core.settings import _normalize_sync_url
 
     assert _normalize_sync_url("sqlite:///local.db") == "sqlite:///local.db"
 

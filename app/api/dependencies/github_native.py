@@ -5,9 +5,9 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.domains.github_native import GithubClient
-from app.domains.github_native.actions_runner import GithubActionsRunner
-from app.infra.config import settings
+from app.core.settings import settings
+from app.integrations.github import GithubClient
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 
 @lru_cache(maxsize=1)

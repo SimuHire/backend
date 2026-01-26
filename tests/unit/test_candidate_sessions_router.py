@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.routes import candidate_sessions
-from app.infra.config import settings
-from app.infra.security.principal import Principal
+from app.api.routers import candidate_sessions
+from app.core.auth.principal import Principal
+from app.core.settings import settings
 
 
 def _principal(email: str) -> Principal:

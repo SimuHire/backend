@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.infra.db import init_db_if_needed as _init_db_if_needed
+from app.core.db import init_db_if_needed as _init_db_if_needed
 
 
 @asynccontextmanager

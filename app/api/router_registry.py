@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api.routes import (
+from app.api.routers import (
     admin_templates,
     auth,
     candidate_sessions,
@@ -11,7 +11,7 @@ from app.api.routes import (
     submissions,
     tasks_codespaces,
 )
-from app.infra.config import settings
+from app.core.settings import settings
 
 
 def register_routers(app: FastAPI) -> None:

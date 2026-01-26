@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.infra.notifications.email_provider import (
+from app.integrations.notifications.email_provider import (
     EmailMessage,
     EmailSendError,
     ResendEmailProvider,

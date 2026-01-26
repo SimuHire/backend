@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import status
 
-from app.domains.github_native.client import GithubError
-from app.infra.errors import ApiError
+from app.core.errors import ApiError
+from app.integrations.github.client import GithubError
 
 
 def map_github_error(exc: GithubError) -> ApiError:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.infra.logging import configure_logging
-from app.infra.perf import RequestPerfMiddleware, perf_logging_enabled
+from app.core.logging import configure_logging
+from app.core.perf import RequestPerfMiddleware, perf_logging_enabled
 
 
 def configure_core_logging() -> None:
@@ -13,8 +13,8 @@ def configure_core_logging() -> None:
 def configure_perf_logging(app: FastAPI) -> None:
     if not perf_logging_enabled():
         return
-    from app.infra.db import engine
-    from app.infra.perf import attach_sqlalchemy_listeners
+    from app.core.db import engine
+    from app.core.perf import attach_sqlalchemy_listeners
 
     attach_sqlalchemy_listeners(engine)
     app.add_middleware(RequestPerfMiddleware)

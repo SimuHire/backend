@@ -1,9 +1,9 @@
 import pytest
 
-import app.infra.security.auth0 as auth0_module
-from app.infra.config import settings
-from app.infra.security import dependencies as security_deps
-from app.infra.security.current_user import get_current_user
+import app.core.auth.auth0 as auth0_module
+from app.core.auth import dependencies as security_deps
+from app.core.auth.current_user import get_current_user
+from app.core.settings import settings
 from tests.factories import (
     create_candidate_session,
     create_recruiter,
@@ -89,8 +89,8 @@ async def test_candidate_current_task_requires_auth(
     sim, _ = await create_simulation(async_session, created_by=recruiter)
     cs = await create_candidate_session(async_session, simulation=sim)
 
-    from app.infra.security import dependencies as security_deps
-    from app.infra.security.principal import get_principal
+    from app.core.auth import dependencies as security_deps
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.get(
@@ -125,8 +125,8 @@ async def test_candidate_codespace_requires_auth(
     cs = await create_candidate_session(async_session, simulation=sim)
     task_id = tasks[0].id
 
-    from app.infra.security import dependencies as security_deps
-    from app.infra.security.principal import get_principal
+    from app.core.auth import dependencies as security_deps
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.post(
@@ -146,8 +146,8 @@ async def test_candidate_run_requires_auth(
     cs = await create_candidate_session(async_session, simulation=sim)
     task_id = tasks[0].id
 
-    from app.infra.security import dependencies as security_deps
-    from app.infra.security.principal import get_principal
+    from app.core.auth import dependencies as security_deps
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.post(
@@ -207,7 +207,7 @@ async def test_namespaced_permissions_only_candidate_access(
         }
 
     monkeypatch.setattr(auth0_module, "decode_auth0_token", decode)
-    from app.infra.security.principal import get_principal
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.get(
@@ -257,7 +257,7 @@ async def test_roles_mapping_allows_candidate_route(
         }
 
     monkeypatch.setattr(auth0_module, "decode_auth0_token", decode)
-    from app.infra.security.principal import get_principal
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.get(
@@ -283,7 +283,7 @@ async def test_missing_permissions_and_roles_returns_403(
         }
 
     monkeypatch.setattr(auth0_module, "decode_auth0_token", decode)
-    from app.infra.security.principal import get_principal
+    from app.core.auth.principal import get_principal
 
     with override_dependencies({get_principal: security_deps.get_principal}):
         res = await async_client.get(

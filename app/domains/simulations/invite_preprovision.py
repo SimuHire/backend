@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
-from app.domains.github_native import GithubClient, GithubError
+from app.core.settings import settings
 from app.domains.submissions import service_candidate as submission_service
-from app.infra.config import settings
+from app.integrations.github import GithubClient, GithubError
 
 logger = logging.getLogger(__name__)
 

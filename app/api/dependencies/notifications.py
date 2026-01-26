@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from app.infra.config import settings
-from app.infra.notifications.email_provider import (
+from app.core.settings import settings
+from app.integrations.notifications.email_provider import (
     ConsoleEmailProvider,
     EmailProvider,
     ResendEmailProvider,

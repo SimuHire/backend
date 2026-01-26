@@ -6,7 +6,7 @@ from fastapi import status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.domains.tasks.template_catalog import ALLOWED_TEMPLATE_KEYS
+from app.services.tasks.template_catalog import ALLOWED_TEMPLATE_KEYS
 
 
 def validation_error_handler(_request, exc: RequestValidationError) -> JSONResponse:

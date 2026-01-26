@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy import select
 
+from app.core.auth.current_user import get_current_user
 from app.domains import Company, Task, User
-from app.infra.security.current_user import get_current_user
 
 
 @pytest.mark.asyncio

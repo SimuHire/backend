@@ -4,7 +4,7 @@ import pytest
 
 from app.domains.notifications import service as notification_service
 from app.domains.simulations import service as sim_service
-from app.infra.notifications.email_provider import MemoryEmailProvider
+from app.integrations.notifications.email_provider import MemoryEmailProvider
 from app.services.email import EmailService
 from tests.factories import (
     create_candidate_session,
@@ -79,7 +79,7 @@ async def test_send_invite_email_failure_path(async_session):
 
     class FailingProvider:
         async def send(self, message):
-            from app.infra.notifications.email_provider import EmailSendError
+            from app.integrations.notifications.email_provider import EmailSendError
 
             raise EmailSendError("boom")
 

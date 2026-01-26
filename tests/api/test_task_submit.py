@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession, Company, Submission, User
-from app.domains.github_native.workspaces.workspace import Workspace
+from app.integrations.github.workspaces.workspace import Workspace
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

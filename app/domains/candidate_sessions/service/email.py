@@ -1,7 +1,1 @@
-from __future__ import annotations
-
-
-def normalize_email(value: str) -> str:
-    if not isinstance(value, str):
-        return ""
-    return value.strip().lower()
+from app.services.candidate_sessions.email import *  # noqa: F403
