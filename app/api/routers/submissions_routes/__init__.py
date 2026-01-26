@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes.submissions_routes import detail, list
+from app.api.routers.submissions_routes import detail, list
 
 router = APIRouter(tags=["submissions"])
 router.include_router(detail.router)

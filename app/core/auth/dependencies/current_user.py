@@ -7,9 +7,9 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains import User
-from app.core.db import get_session
 from app.core.auth.principal import bearer_scheme, get_principal
+from app.core.db import get_session
+from app.domains import User
 
 from .dev_bypass import dev_bypass_user
 from .users import user_from_principal

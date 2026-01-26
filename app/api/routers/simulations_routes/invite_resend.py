@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.notifications import get_email_service
-from app.api.routes.simulations_routes.invite_render import render_invite_status
-from app.api.routes.simulations_routes.invite_resend_logic import resend_invite
-from app.core.db import get_session
+from app.api.routers.simulations_routes.invite_render import render_invite_status
+from app.api.routers.simulations_routes.invite_resend_logic import resend_invite
 from app.core.auth.current_user import get_current_user
+from app.core.db import get_session
 from app.services.email import EmailService
 
 router = APIRouter()

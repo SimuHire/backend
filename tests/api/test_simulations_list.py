@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 
+from app.core.auth.current_user import get_current_user
 from app.domains import CandidateSession, Company, User
-from app.infra.security.current_user import get_current_user
 
 
 @pytest_asyncio.fixture

@@ -4,10 +4,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.principal import Principal
 from app.domains.candidate_sessions.service.fetch import fetch_by_token_for_update
 from app.domains.candidate_sessions.service.ownership import ensure_candidate_ownership
 from app.domains.candidate_sessions.service.status import mark_in_progress
-from app.core.auth.principal import Principal
 
 
 async def claim_invite_with_principal(

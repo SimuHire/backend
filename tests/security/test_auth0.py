@@ -5,7 +5,7 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 from jose.utils import base64url_encode
 
-from app.infra.security import auth0
+from app.core.auth import auth0
 
 
 def test_decode_auth0_token_invalid_header(monkeypatch):

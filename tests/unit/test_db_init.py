@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.infra import db
+from app.core import db
 
 
 @pytest.mark.asyncio

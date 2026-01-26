@@ -5,15 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.api.dependencies.github_native import get_github_client
-from app.api.routes.admin_templates.schemas import TemplateHealthRunRequest
-from app.api.routes.admin_templates.validation import validate_live_request
+from app.api.routers.admin_templates.schemas import TemplateHealthRunRequest
+from app.api.routers.admin_templates.validation import validate_live_request
+from app.core.auth.admin_api_key import require_admin_key
+from app.core.settings import settings
 from app.integrations.github import GithubClient
 from app.integrations.github.template_health import (
     TemplateHealthResponse,
     check_template_health,
 )
-from app.core.settings import settings
-from app.core.auth.admin_api_key import require_admin_key
 
 router = APIRouter()
 

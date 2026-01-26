@@ -6,9 +6,9 @@ from datetime import UTC, datetime
 import pytest
 
 from app.api.dependencies.github_native import get_github_client
+from app.core.settings import settings
 from app.integrations.github import GithubError, WorkflowRun
-from app.domains.tasks.template_catalog import TEMPLATE_CATALOG
-from app.infra.config import settings
+from app.services.tasks.template_catalog import TEMPLATE_CATALOG
 
 
 class MissingWorkflowGithubClient:

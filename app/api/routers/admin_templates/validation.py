@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
-from app.domains.tasks.template_catalog import (
+from app.services.tasks.template_catalog import (
     ALLOWED_TEMPLATE_KEYS,
     validate_template_key,
 )

@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 import asyncio
+
 from app.integrations.notifications.email_provider import (
     EmailMessage,
     EmailProvider,

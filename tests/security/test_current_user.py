@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from app.infra.db import get_session
-from app.infra.security import auth0, current_user
+from app.core.auth import auth0, current_user
+from app.core.db import get_session
 from app.main import app
 
 

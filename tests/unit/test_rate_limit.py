@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.infra.security import rate_limit
+from app.core.auth import rate_limit
 
 
 def _request(host: str | None, headers: dict[str, str] | None = None):

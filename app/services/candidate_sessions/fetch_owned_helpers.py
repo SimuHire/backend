@@ -4,13 +4,13 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 
+from app.core.auth.principal import Principal
 from app.domains import CandidateSession
 from app.domains.candidate_sessions.service.email import normalize_email
 from app.domains.candidate_sessions.service.status import (
     mark_in_progress,
     require_not_expired,
 )
-from app.core.auth.principal import Principal
 
 _NOT_FOUND = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND, detail="Candidate session not found"

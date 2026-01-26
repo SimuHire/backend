@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.principal import Principal
 from app.domains import Task
 from app.repositories.candidate_sessions import repository as cs_repo
 from app.schemas.candidate_sessions import CandidateInviteListItem
 from app.services.candidate_sessions.invite_activity import last_submission_map
 from app.services.candidate_sessions.invite_items import build_invite_item
-from app.core.auth.principal import Principal
 
 
 async def invite_list_for_principal(

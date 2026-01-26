@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from .names import split_full_name
 from .runs import WorkflowRun, parse_run
 from .transport import GithubTransport

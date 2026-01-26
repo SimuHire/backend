@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes.candidate_sessions_routes import current_task, invites, resolve
+from app.api.routers.candidate_sessions_routes import current_task, invites, resolve
 
 router = APIRouter()
 router.include_router(resolve.router)

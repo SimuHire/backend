@@ -1,5 +1,5 @@
-from app.integrations.github.actions_runner import ActionsRunResult
 from app.domains.submissions.schemas import RunTestsResponse
+from app.integrations.github.actions_runner import ActionsRunResult
 
 
 def build_run_response(result: ActionsRunResult) -> RunTestsResponse:

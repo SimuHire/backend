@@ -15,13 +15,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.dependencies.github_native import get_github_client
-from app.api.routes import tasks_codespaces as candidate_submissions
+from app.api.routers import tasks_codespaces as candidate_submissions
+from app.core.auth.current_user import get_current_user
+from app.core.auth.principal import Principal, get_principal
+from app.core.db import get_session
+from app.core.settings import settings
 from app.domains import Base, User
 from app.integrations.github.actions_runner import ActionsRunResult
-from app.infra.config import settings
-from app.infra.db import get_session
-from app.infra.security.current_user import get_current_user
-from app.infra.security.principal import Principal, get_principal
 from app.main import app
 
 settings.ENV = "test"

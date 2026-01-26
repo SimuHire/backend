@@ -6,7 +6,7 @@ import pytest
 from fastapi import Request
 from sqlalchemy.exc import IntegrityError
 
-from app.infra.security import dependencies
+from app.core.auth import dependencies
 from tests.factories import create_recruiter
 
 
@@ -66,7 +66,7 @@ async def test_dev_bypass_guard_against_prod(monkeypatch):
 def test_env_name_override(monkeypatch):
     override_module = type("m", (), {"_env_name": lambda: "override"})
     monkeypatch.setitem(
-        dependencies.sys.modules, "app.infra.security.current_user", override_module
+        dependencies.sys.modules, "app.core.auth.current_user", override_module
     )
     assert dependencies._env_name() == "override"
 
@@ -96,7 +96,7 @@ async def test_dev_bypass_fallback_session_maker(monkeypatch):
 
     monkeypatch.setitem(
         dependencies.sys.modules,
-        "app.infra.security.current_user",
+        "app.core.auth.current_user",
         type("mod", (), {"async_session_maker": _ctx_maker(DummySession())}),
     )
 
@@ -122,7 +122,7 @@ def test_env_helpers(monkeypatch):
     monkeypatch.setattr(dependencies.settings, "ENV", "Prod")
     assert dependencies._env_name_base() == "prod"
     # No override module present -> falls back to base env
-    dependencies.sys.modules.pop("app.infra.security.current_user", None)
+    dependencies.sys.modules.pop("app.core.auth.current_user", None)
     assert dependencies._env_name() == "prod"
 
 
@@ -154,7 +154,7 @@ async def test_user_from_principal_uses_session_maker(monkeypatch):
     monkeypatch.setattr(dependencies, "_lookup_user", fake_lookup)
     monkeypatch.setitem(
         dependencies.sys.modules,
-        "app.infra.security.current_user",
+        "app.core.auth.current_user",
         type("mod", (), {"async_session_maker": _ctx_maker(object())}),
     )
     user = await dependencies._user_from_principal(principal, db=None)

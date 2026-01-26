@@ -5,8 +5,8 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from starlette.requests import Request
 
-from app.infra.config import settings
-from app.infra.security import auth0, principal
+from app.core.auth import auth0, principal
+from app.core.settings import settings
 
 
 def test_extract_principal_missing_email_claim():

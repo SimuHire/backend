@@ -2,10 +2,10 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 import app.domains  # noqa: F401  # ensure models are imported for metadata
-from app.core.settings import settings
+from alembic import context
 from app.core.db.base import Base
+from app.core.settings import settings
 
 config = context.config
 

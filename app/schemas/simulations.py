@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serial
 
 from app.domains.common.types import TaskType
 from app.domains.tasks.schemas_public import TaskPublic
-from app.domains.tasks.template_catalog import (
+from app.services.tasks.template_catalog import (
     DEFAULT_TEMPLATE_KEY,
     TemplateKeyError,
     validate_template_key,

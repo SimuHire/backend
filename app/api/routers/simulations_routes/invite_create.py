@@ -7,16 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.github_native import get_github_client
 from app.api.dependencies.notifications import get_email_service
-from app.api.routes.simulations_routes.invite_create_logic import create_invite_response
+from app.api.routers.simulations_routes.invite_create_logic import (
+    create_invite_response,
+)
+from app.core.auth.current_user import get_current_user
+from app.core.auth.roles import ensure_recruiter_or_none
+from app.core.db import get_session
 from app.domains.candidate_sessions.schemas import (
     CandidateInviteErrorResponse,
     CandidateInviteRequest,
     CandidateInviteResponse,
 )
 from app.integrations.github import GithubClient
-from app.core.db import get_session
-from app.core.auth.current_user import get_current_user
-from app.core.auth.roles import ensure_recruiter_or_none
 from app.services.email import EmailService
 
 router = APIRouter()

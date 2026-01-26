@@ -6,7 +6,10 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import Task
-from app.domains.candidate_sessions.schemas import CandidateInviteListItem, ProgressSummary
+from app.domains.candidate_sessions.schemas import (
+    CandidateInviteListItem,
+    ProgressSummary,
+)
 from app.services.candidate_sessions.progress import progress_snapshot
 
 

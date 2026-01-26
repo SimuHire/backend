@@ -5,11 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.candidate_sessions import candidate_session_from_headers
 from app.api.dependencies.github_native import get_actions_runner
-from app.api.routes.tasks.handlers import handle_run_tests
-from app.domains import CandidateSession
-from app.integrations.github.actions_runner import GithubActionsRunner
-from app.domains.submissions.schemas import RunTestsRequest, RunTestsResponse
+from app.api.routers.tasks.handlers import handle_run_tests
 from app.core.db import get_session
+from app.domains import CandidateSession
+from app.domains.submissions.schemas import RunTestsRequest, RunTestsResponse
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 router = APIRouter()
 

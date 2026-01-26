@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession
-from app.integrations.github.client import GithubClient
 from app.domains.submissions import service_candidate as submission_service
 from app.domains.submissions.rate_limits import apply_rate_limit
 from app.domains.submissions.use_cases.submit_task_runner import run_code_submission
 from app.domains.submissions.use_cases.submit_validation import validate_submission_flow
+from app.integrations.github.client import GithubClient
 
 
 async def submit_task(

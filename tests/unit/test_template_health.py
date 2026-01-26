@@ -16,7 +16,7 @@ from app.integrations.github.template_health import (
     check_template_health,
     workflow_contract_errors,
 )
-from app.domains.tasks.template_catalog import TEMPLATE_CATALOG
+from app.services.tasks.template_catalog import TEMPLATE_CATALOG
 
 
 def test_workflow_contract_errors_ok():

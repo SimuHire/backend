@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.principal import Principal
 from app.domains import CandidateSession
 from app.domains.candidate_sessions import repository as cs_repo
 from app.domains.candidate_sessions.service.fetch_owned_helpers import (
@@ -11,7 +12,6 @@ from app.domains.candidate_sessions.service.fetch_owned_helpers import (
     ensure_can_access,
 )
 from app.domains.candidate_sessions.service.ownership import ensure_candidate_ownership
-from app.core.auth.principal import Principal
 
 
 async def fetch_owned_session(

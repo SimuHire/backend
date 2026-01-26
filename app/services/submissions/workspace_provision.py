@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domains import CandidateSession, Task
 from app.integrations.github.client import GithubClient
 from app.repositories.github_native.workspaces.models import Workspace

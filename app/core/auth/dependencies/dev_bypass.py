@@ -5,8 +5,8 @@ import sys
 from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import settings
 from app.core.db import async_session_maker
+from app.core.settings import settings
 
 from .db import lookup_user as lookup_user_default
 from .env import env_name

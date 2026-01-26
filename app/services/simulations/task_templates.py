@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.domains.tasks import template_catalog
 from app.core.settings import settings
+from app.domains.tasks import template_catalog
 
 
 def _resolver():

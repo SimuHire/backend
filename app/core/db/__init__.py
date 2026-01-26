@@ -6,8 +6,8 @@ from typing import Final
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.settings import settings
 from app.core.db.base import Base
+from app.core.settings import settings
 
 DEFAULT_SQLITE_URL: Final[
     str

@@ -2,10 +2,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.domains import User
-from app.domains.users.schemas import UserRead
 from app.core.auth import rate_limit
 from app.core.auth.current_user import get_current_user
+from app.domains import User
+from app.domains.users.schemas import UserRead
 
 router = APIRouter()
 

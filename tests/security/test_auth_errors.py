@@ -1,6 +1,6 @@
 from fastapi import status
 
-from app.infra.security.errors import AuthError
+from app.core.auth.errors import AuthError
 
 
 def test_auth_error_defaults():

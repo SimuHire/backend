@@ -1,9 +1,9 @@
 """Aggregator for candidate session routes split into submodules."""
 
-from app.api.routes.candidate_sessions_routes import rate_limits, router
-from app.api.routes.candidate_sessions_routes.current_task import get_current_task
-from app.api.routes.candidate_sessions_routes.invites import list_candidate_invites
-from app.api.routes.candidate_sessions_routes.resolve import (
+from app.api.routers.candidate_sessions_routes import rate_limits, router
+from app.api.routers.candidate_sessions_routes.current_task import get_current_task
+from app.api.routers.candidate_sessions_routes.invites import list_candidate_invites
+from app.api.routers.candidate_sessions_routes.resolve import (
     claim_candidate_session,
     resolve_candidate_session,
 )

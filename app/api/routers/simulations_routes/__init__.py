@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes.simulations_routes import (
+from app.api.routers.simulations_routes import (
     candidates,
     create,
     detail,

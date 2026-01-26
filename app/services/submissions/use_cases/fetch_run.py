@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession
-from app.integrations.github.actions_runner import GithubActionsRunner
 from app.domains.submissions import service_candidate as submission_service
 from app.domains.submissions.exceptions import WorkspaceMissing
 from app.domains.submissions.rate_limits import (
@@ -11,6 +10,7 @@ from app.domains.submissions.rate_limits import (
     concurrency_guard,
     throttle_poll,
 )
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 
 async def fetch_run_result(

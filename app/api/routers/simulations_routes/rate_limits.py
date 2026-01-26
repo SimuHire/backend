@@ -10,14 +10,14 @@ INVITE_RESEND_RATE_LIMIT = rate_limit.RateLimitRule(limit=10, window_seconds=60.
 
 def _invite_create_rule():
     # Allow tests to override the rate limit via the aggregated simulations module.
-    from app.api.routes import simulations as sim_routes
+    from app.api.routers import simulations as sim_routes
 
     return getattr(sim_routes, "INVITE_CREATE_RATE_LIMIT", INVITE_CREATE_RATE_LIMIT)
 
 
 def _invite_resend_rule():
     # Allow tests to override the rate limit via the aggregated simulations module.
-    from app.api.routes import simulations as sim_routes
+    from app.api.routers import simulations as sim_routes
 
     return getattr(sim_routes, "INVITE_RESEND_RATE_LIMIT", INVITE_RESEND_RATE_LIMIT)
 

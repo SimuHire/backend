@@ -9,7 +9,7 @@ from app.integrations.github.template_health.schemas import (
     RunMode,
     TemplateHealthResponse,
 )
-from app.domains.tasks.template_catalog import TEMPLATE_CATALOG
+from app.services.tasks.template_catalog import TEMPLATE_CATALOG
 
 
 async def check_template_health(

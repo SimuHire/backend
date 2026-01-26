@@ -1,7 +1,7 @@
 import pytest
 
 from app import api
-from app.infra import perf
+from app.core import perf
 
 
 @pytest.mark.asyncio
@@ -42,9 +42,9 @@ def test_configure_perf_logging_when_enabled(monkeypatch):
     def fake_attach(engine):
         calls["engine"] = engine
 
-    monkeypatch.setattr("app.infra.db.engine", DummyEngine(), raising=False)
+    monkeypatch.setattr("app.core.db.engine", DummyEngine(), raising=False)
     monkeypatch.setattr(
-        "app.infra.perf.attach_sqlalchemy_listeners", fake_attach, raising=False
+        "app.core.perf.attach_sqlalchemy_listeners", fake_attach, raising=False
     )
 
     class DummyApp:
@@ -56,7 +56,7 @@ def test_configure_perf_logging_when_enabled(monkeypatch):
 
     app_obj = DummyApp()
     api.main._configure_perf_logging(app_obj)
-    from app.infra import db
+    from app.core import db
 
     assert calls["engine"] is db.engine
     assert perf.RequestPerfMiddleware in app_obj.middlewares

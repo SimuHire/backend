@@ -3,19 +3,19 @@
 from fastapi import APIRouter
 
 from app.api.dependencies.github_native import get_actions_runner, get_github_client
-from app.api.routes.tasks import init as init_route
-from app.api.routes.tasks import poll, run, status, submit
-from app.api.routes.tasks import router as tasks_router
-from app.api.routes.tasks.helpers import (
+from app.api.routers.tasks import init as init_route
+from app.api.routers.tasks import poll, run, status, submit
+from app.api.routers.tasks import router as tasks_router
+from app.api.routers.tasks.helpers import (
     _compute_current_task,
     _concurrency_guard,
     _rate_limit_or_429,
 )
+from app.core.auth import rate_limit
+from app.core.settings import settings
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.submissions import rate_limits as submissions_rate_limits
 from app.domains.submissions import service_candidate as submission_service
-from app.core.settings import settings
-from app.core.auth import rate_limit
 
 router = APIRouter()
 router.include_router(tasks_router)

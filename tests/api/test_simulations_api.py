@@ -6,7 +6,7 @@ from app.api.dependencies.notifications import get_email_service
 from app.domains import CandidateSession
 from app.integrations.github.client import GithubError
 from app.integrations.github.workspaces.workspace import Workspace
-from app.infra.notifications.email_provider import MemoryEmailProvider
+from app.integrations.notifications.email_provider import MemoryEmailProvider
 from app.services.email import EmailService
 from tests.factories import create_recruiter, create_simulation
 

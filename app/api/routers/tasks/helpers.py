@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+from app.core.auth import rate_limit
 from app.domains.candidate_sessions import service as cs_service
 from app.domains.submissions.rate_limits import apply_rate_limit
-from app.core.auth import rate_limit
 
 
 def _rate_limit_or_429(candidate_session_id: int, action: str) -> None:

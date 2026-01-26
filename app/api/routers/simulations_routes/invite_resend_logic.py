@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.simulations_routes.rate_limits import enforce_invite_resend_limit
+from app.api.routers.simulations_routes.rate_limits import enforce_invite_resend_limit
+from app.core.auth.roles import ensure_recruiter_or_none
 from app.domains import CandidateSession
 from app.domains.notifications import service as notification_service
 from app.domains.simulations import service as sim_service
-from app.core.auth.roles import ensure_recruiter_or_none
 from app.services.email import EmailService
 
 

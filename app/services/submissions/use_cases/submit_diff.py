@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from app.integrations.github.client import GithubClient
 from app.domains.submissions import service_candidate as submission_service
 from app.domains.submissions.services.workspace_records import Workspace
+from app.integrations.github.client import GithubClient
 
 
 async def build_diff_summary(

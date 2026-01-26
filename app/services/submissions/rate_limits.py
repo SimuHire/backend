@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from contextlib import asynccontextmanager
+
 from app.core.auth import rate_limit
 
 _DEFAULT_RATE_LIMIT_RULES = {
@@ -13,7 +15,7 @@ RUN_CONCURRENCY_LIMIT = 1
 
 def _rules() -> dict[str, rate_limit.RateLimitRule]:
     try:
-        from app.api.routes import tasks_codespaces
+        from app.api.routers import tasks_codespaces
         override = getattr(tasks_codespaces, "_RATE_LIMIT_RULE", None)
         if isinstance(override, dict):
             return override

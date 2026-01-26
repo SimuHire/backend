@@ -9,7 +9,7 @@ CANDIDATE_INVITES_RATE_LIMIT = rate_limit.RateLimitRule(limit=30, window_seconds
 
 def _claim_rule():
     # Allow tests to override the rate limit via the aggregated candidate routes module.
-    from app.api.routes import candidate_sessions as candidate_routes
+    from app.api.routers import candidate_sessions as candidate_routes
 
     return getattr(
         candidate_routes, "CANDIDATE_CLAIM_RATE_LIMIT", CANDIDATE_CLAIM_RATE_LIMIT

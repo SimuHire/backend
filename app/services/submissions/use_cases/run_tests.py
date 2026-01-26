@@ -3,10 +3,10 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains import CandidateSession
-from app.integrations.github.actions_runner import GithubActionsRunner
 from app.domains.submissions import service_candidate as submission_service
 from app.domains.submissions.exceptions import WorkspaceMissing
 from app.domains.submissions.rate_limits import apply_rate_limit, concurrency_guard
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 
 async def run_task_tests(

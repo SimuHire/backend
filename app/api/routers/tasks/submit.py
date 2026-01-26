@@ -5,15 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.candidate_sessions import candidate_session_from_headers
 from app.api.dependencies.github_native import get_actions_runner, get_github_client
-from app.api.routes.tasks.handlers import handle_submit_task
+from app.api.routers.tasks.handlers import handle_submit_task
+from app.core.db import get_session
 from app.domains import CandidateSession
-from app.integrations.github import GithubClient
-from app.integrations.github.actions_runner import GithubActionsRunner
 from app.domains.submissions.schemas import (
     SubmissionCreateRequest,
     SubmissionCreateResponse,
 )
-from app.core.db import get_session
+from app.integrations.github import GithubClient
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 router = APIRouter()
 

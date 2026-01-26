@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.error_utils import map_github_error
+from app.core.settings import settings
 from app.domains import CandidateSession
-from app.integrations.github import GithubClient, GithubError
 from app.domains.submissions.schemas import CodespaceInitRequest, CodespaceInitResponse
 from app.domains.submissions.use_cases.codespace_init import init_codespace
-from app.core.settings import settings
+from app.integrations.github import GithubClient, GithubError
 
 
 async def handle_codespace_init(

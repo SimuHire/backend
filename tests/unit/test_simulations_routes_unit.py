@@ -3,10 +3,10 @@ from types import SimpleNamespace
 import pytest
 
 from app.api import error_utils
-from app.api.routes import simulations
-from app.integrations.github.client import GithubError
+from app.api.routers import simulations
+from app.core.auth import rate_limit
 from app.domains.simulations import service as sim_service
-from app.infra.security import rate_limit
+from app.integrations.github.client import GithubError
 
 
 def _fake_request():

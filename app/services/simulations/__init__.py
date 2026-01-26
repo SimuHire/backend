@@ -1,8 +1,8 @@
-from app.domains.candidate_sessions import repository as cs_repo
-from app.domains.simulations import repository as sim_repo
-from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
-from app.domains.tasks.template_catalog import resolve_template_repo_full_name
 from app.core.settings import settings
+from app.domains.simulations.blueprints import DEFAULT_5_DAY_BLUEPRINT
+from app.repositories.candidate_sessions import repository as cs_repo
+from app.repositories.simulations import repository as sim_repo
+from app.services.tasks.template_catalog import resolve_template_repo_full_name
 
 from .creation import create_simulation_with_tasks
 from .invite_create import create_invite

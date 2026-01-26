@@ -4,14 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.error_utils import map_github_error
 from app.domains import CandidateSession
-from app.integrations.github import GithubClient, GithubError
-from app.integrations.github.actions_runner import GithubActionsRunner
 from app.domains.submissions.schemas import (
     ProgressSummary,
     SubmissionCreateRequest,
     SubmissionCreateResponse,
 )
 from app.domains.submissions.use_cases.submit_task import submit_task
+from app.integrations.github import GithubClient, GithubError
+from app.integrations.github.actions_runner import GithubActionsRunner
 
 
 async def handle_submit_task(

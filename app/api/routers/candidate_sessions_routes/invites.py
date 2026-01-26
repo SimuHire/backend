@@ -3,15 +3,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.candidate_sessions_routes.rate_limits import (
+from app.api.routers.candidate_sessions_routes.rate_limits import (
     CANDIDATE_INVITES_RATE_LIMIT,
 )
-from app.domains.candidate_sessions import service as cs_service
-from app.domains.candidate_sessions.schemas import CandidateInviteListItem
-from app.core.db import get_session
 from app.core.auth import rate_limit
 from app.core.auth.candidate_access import require_candidate_principal
 from app.core.auth.principal import Principal
+from app.core.db import get_session
+from app.domains.candidate_sessions import service as cs_service
+from app.domains.candidate_sessions.schemas import CandidateInviteListItem
 
 router = APIRouter()
 

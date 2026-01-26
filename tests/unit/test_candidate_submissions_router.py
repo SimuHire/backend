@@ -7,16 +7,16 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.dependencies.candidate_sessions import candidate_session_from_headers
-from app.api.routes import tasks_codespaces as candidate_submissions
-from app.integrations.github.actions_runner import ActionsRunResult
-from app.integrations.github.client import GithubError
+from app.api.routers import tasks_codespaces as candidate_submissions
+from app.core.auth.principal import Principal
+from app.core.settings import settings
 from app.domains.submissions.schemas import (
     CodespaceInitRequest,
     RunTestsRequest,
     SubmissionCreateRequest,
 )
-from app.infra.config import settings
-from app.infra.security.principal import Principal
+from app.integrations.github.actions_runner import ActionsRunResult
+from app.integrations.github.client import GithubError
 
 
 def _async_return(val):

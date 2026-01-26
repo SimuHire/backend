@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import HTTPException
 
+from app.core.auth.principal import Principal
+from app.core.settings import settings
 from app.domains.candidate_sessions import service as cs_service
-from app.infra.config import settings
-from app.infra.security.principal import Principal
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

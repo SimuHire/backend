@@ -1,14 +1,17 @@
 from __future__ import annotations
+
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ApiError
 from app.integrations.github.client import GithubClient, GithubError
+from app.repositories.github_native.workspaces.models import Workspace
 from app.services.submissions import service_candidate as submission_service
 from app.services.submissions.run_service import ActionsRunResult
-from app.repositories.github_native.workspaces.models import Workspace
 from app.services.submissions.use_cases.submit_diff import build_diff_summary
-from app.services.submissions.use_cases.submit_workspace import fetch_workspace_and_branch
-from app.core.errors import ApiError
+from app.services.submissions.use_cases.submit_workspace import (
+    fetch_workspace_and_branch,
+)
 
 
 async def run_code_submission(

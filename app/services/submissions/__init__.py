@@ -26,6 +26,7 @@ from app.services.submissions.workspace_records import (
     build_codespace_url,
     record_run_result,
 )
+
 __all__ = [
     "CODE_TASK_TYPES",
     "TEXT_TASK_TYPES",

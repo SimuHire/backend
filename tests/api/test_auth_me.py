@@ -2,10 +2,10 @@ import httpx
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.api.routes import auth as auth_routes
-from app.infra.config import settings
-from app.infra.db import get_session
-from app.infra.security import auth0, current_user
+from app.api.routers import auth as auth_routes
+from app.core.auth import auth0, current_user
+from app.core.db import get_session
+from app.core.settings import settings
 from app.main import app
 
 

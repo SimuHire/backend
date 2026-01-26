@@ -5,7 +5,7 @@ from app.core.auth.roles import ensure_recruiter
 
 def ensure_recruiter_guard(user):
     try:
-        from app.api.routes import submissions as submissions_routes
+        from app.api.routers import submissions as submissions_routes
     except Exception:
         return ensure_recruiter(user)
     return getattr(submissions_routes, "ensure_recruiter", ensure_recruiter)(user)

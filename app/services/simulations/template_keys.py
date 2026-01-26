@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from fastapi import status
 
-from app.domains.tasks.template_catalog import (
+from app.core.errors import ApiError
+from app.services.tasks.template_catalog import (
     ALLOWED_TEMPLATE_KEYS,
     DEFAULT_TEMPLATE_KEY,
     TemplateKeyError,
     validate_template_key,
 )
-from app.core.errors import ApiError
 
 
 def resolve_template_key(payload) -> str:

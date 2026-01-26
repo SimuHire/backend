@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.candidate_sessions import candidate_session_from_headers
+from app.core.db import get_session
 from app.domains import CandidateSession
 from app.domains.submissions.schemas import CodespaceStatusResponse
 from app.domains.submissions.use_cases.codespace_status import codespace_status
-from app.core.db import get_session
 
 router = APIRouter()
 

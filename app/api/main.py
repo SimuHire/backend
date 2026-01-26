@@ -1,9 +1,9 @@
 from app.api.app_builder import create_app
 from app.api.app_meta import _env_name, _parse_csv
 from app.api.lifespan import lifespan
-from app.core.settings import settings
 from app.core.db import init_db_if_needed
 from app.core.perf import perf_logging_enabled
+from app.core.settings import settings
 
 app = create_app()
 

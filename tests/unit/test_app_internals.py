@@ -1,7 +1,7 @@
 import pytest
 
-from app.infra import db
-from app.infra.config import settings
+from app.core import db
+from app.core.settings import settings
 from app.main import _env_name, _parse_csv, create_app
 
 

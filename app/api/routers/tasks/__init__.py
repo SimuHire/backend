@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes.tasks import init, poll, run, status, submit
+from app.api.routers.tasks import init, poll, run, status, submit
 
 router = APIRouter()
 router.include_router(init.router)

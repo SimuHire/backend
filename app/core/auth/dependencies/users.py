@@ -5,9 +5,9 @@ import sys
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains import User
-from app.core.db import async_session_maker
 from app.core.auth.principal import Principal
+from app.core.db import async_session_maker
+from app.domains import User
 
 from .db import lookup_user as lookup_user_default
 from .modules import current_user_module

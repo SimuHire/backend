@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.infra import perf
+from app.core import perf
 
 
 def test_request_id_from_scope_handles_invalid_bytes(monkeypatch):
@@ -23,7 +23,7 @@ def test_request_id_from_scope_handles_invalid_bytes(monkeypatch):
 @pytest.mark.asyncio
 async def test_perf_middleware_injects_request_id_and_logs(caplog, monkeypatch):
     monkeypatch.setattr(perf.settings, "DEBUG_PERF", True)
-    caplog.set_level(logging.INFO, logger="app.infra.perf")
+    caplog.set_level(logging.INFO, logger="app.core.perf")
 
     app = FastAPI()
 

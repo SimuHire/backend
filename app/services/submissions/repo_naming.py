@@ -4,8 +4,8 @@ import re
 
 from fastapi import status
 
-from app.domains import CandidateSession, Task
 from app.core.errors import ApiError
+from app.domains import CandidateSession, Task
 
 _REPO_FULL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 

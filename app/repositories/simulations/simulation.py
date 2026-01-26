@@ -1,8 +1,8 @@
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domains.tasks.template_catalog import DEFAULT_TEMPLATE_KEY
 from app.core.db.base import Base, TimestampMixin
+from app.services.tasks.template_catalog import DEFAULT_TEMPLATE_KEY
 
 
 class Simulation(Base, TimestampMixin):

@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.api.routes import candidate_sessions as candidate_routes
+from app.api.routers import candidate_sessions as candidate_routes
+from app.core.settings import settings
 from app.domains import Task
-from app.infra.config import settings
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

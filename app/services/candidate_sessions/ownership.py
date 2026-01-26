@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
+from app.core.auth.principal import Principal
 from app.domains import CandidateSession
 from app.domains.candidate_sessions.service.email import normalize_email
-from app.core.auth.principal import Principal
 
 
 def _fail(status_code: int, detail: str) -> None:

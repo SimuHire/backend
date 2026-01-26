@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import sys
 
-from app.core.settings import settings
 from app.core.auth.principal import get_principal
+from app.core.settings import settings
 
 from .current_user import get_current_user
 from .db import lookup_user as _lookup_user

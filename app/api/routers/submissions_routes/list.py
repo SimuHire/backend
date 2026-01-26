@@ -4,6 +4,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth.current_user import get_current_user
+from app.core.auth.roles import ensure_recruiter
+from app.core.db import get_session
 from app.domains import User
 from app.domains.submissions import service_recruiter as recruiter_sub_service
 from app.domains.submissions.presenter import present_list_item
@@ -11,9 +14,6 @@ from app.domains.submissions.schemas import (
     RecruiterSubmissionListItemOut,
     RecruiterSubmissionListOut,
 )
-from app.core.db import get_session
-from app.core.auth.current_user import get_current_user
-from app.core.auth.roles import ensure_recruiter
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 

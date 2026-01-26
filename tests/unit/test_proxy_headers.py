@@ -2,8 +2,8 @@ import pytest
 from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.infra import proxy_headers
-from app.infra.proxy_headers import TrustedProxyHeadersMiddleware
+from app.core import proxy_headers
+from app.core.proxy_headers import TrustedProxyHeadersMiddleware
 
 
 def _proxy_test_app(trusted_proxy_cidrs: list[str]) -> FastAPI:

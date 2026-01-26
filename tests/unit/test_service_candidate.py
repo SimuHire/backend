@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.domains.submissions import service_candidate as svc
 from app.integrations.github.actions_runner import ActionsRunResult
 from app.integrations.github.client import GithubError
 from app.integrations.github.workspaces import repository as workspace_repo
-from app.domains.submissions import service_candidate as svc
 from tests.factories import (
     create_candidate_session,
     create_recruiter,

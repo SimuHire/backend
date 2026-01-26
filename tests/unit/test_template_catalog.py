@@ -1,6 +1,6 @@
 import pytest
 
-from app.domains.tasks.template_catalog import (
+from app.services.tasks.template_catalog import (
     ALLOWED_TEMPLATE_KEYS,
     DEFAULT_TEMPLATE_KEY,
     LEGACY_TEMPLATE_REPO_REWRITES,

@@ -2,11 +2,12 @@
 
 from fastapi import APIRouter
 
-from app.api.routes.submissions_helpers import (
+from app.api.routers.submissions_helpers import (
     get_submission_detail,
     list_submissions,
 )
-from app.api.routes.submissions_routes import router as submissions_router
+from app.api.routers.submissions_routes import router as submissions_router
+from app.core.auth.roles import ensure_recruiter
 from app.domains.submissions import service_recruiter as recruiter_sub_service
 from app.domains.submissions.presenter import build_diff_url as _build_diff_url
 from app.domains.submissions.presenter import (
@@ -21,7 +22,6 @@ from app.domains.submissions.presenter import (
 from app.domains.submissions.presenter import (
     truncate_output as _truncate_output,
 )
-from app.core.auth.roles import ensure_recruiter
 
 router = APIRouter()
 router.include_router(submissions_router)

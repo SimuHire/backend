@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
-from app.core.settings import settings
 from app.core.env import is_local_or_test
+from app.core.settings import settings
 
 DEFAULT_RATE_LIMIT_DETAIL = "Too many requests. Please slow down."
 
