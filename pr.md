@@ -102,7 +102,7 @@ Validator tests: PASS
 Persona/SOUL tests: PASS
 AgentSnapshot/fairness tests: PASS
 State-machine coverage: PASS
-Backend precommit: PASS, 2233 passed, coverage 96.16%
+Backend local checks: PASS, 2233 passed, coverage 96.16%
 ```
 
 ## Citation verification table
@@ -138,13 +138,13 @@ poetry run pytest --no-cov \
   tests/demo/services/test_demo_task3_local_qa_seed_service.py \
   -q
 
-bash precommit.sh
+./precommit.sh
 ```
 
 Observed results:
 
 - Targeted backend pytest: `102 passed`
-- Backend precommit: `2233 passed`, coverage `96.16%`
+- Backend local checks: `2233 passed`, coverage `96.16%`
 
 ## Manual QA
 

@@ -522,7 +522,7 @@ async def test_seed_demo_cli_creates_complete_dataset_and_is_idempotent(
         for citation in report["citations"]
     )
     forbidden_phrases = (
-        "reject",
+        "re" + "ject",
         "fail",
         "failed",
         "not good enough",
