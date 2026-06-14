@@ -197,6 +197,16 @@ async def test_live_evaluator_falls_back_once_and_completes(
     for agent in snapshot["agents"].values():
         agent["runtime"]["runtimeMode"] = "real"
     snapshot["snapshotDigest"] = compute_ai_policy_snapshot_basis_fingerprint(snapshot)
+    monkeypatch.setattr(
+        winoe_openai_provider.settings,
+        "OPENAI_API_KEY",
+        "openai-test-key",
+    )
+    monkeypatch.setattr(
+        winoe_openai_provider.settings,
+        "ANTHROPIC_API_KEY",
+        "anthropic-test-key",
+    )
     day1_text = "\n".join(f"design line {index}" for index in range(1, 9))
     day2_text = "\n".join(f"implementation line {index}" for index in range(1, 9))
     day3_text = "\n".join(f"code quality line {index}" for index in range(1, 9))

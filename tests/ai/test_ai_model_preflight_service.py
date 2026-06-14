@@ -146,6 +146,15 @@ def test_verify_ai_model_preflight_raises_on_unreachable_endpoint(monkeypatch) -
 def test_verify_ai_model_preflight_uses_structured_output_probes(monkeypatch) -> None:
     calls: list[tuple[str, str, str]] = []
 
+    monkeypatch.setattr(
+        "app.ai.ai_model_preflight_service.settings.OPENAI_API_KEY",
+        "openai-test-key",
+    )
+    monkeypatch.setattr(
+        "app.ai.ai_model_preflight_service.settings.ANTHROPIC_API_KEY",
+        "anthropic-test-key",
+    )
+
     def _fake_openai(
         *, api_key, model, system_prompt, user_prompt, response_model, **_kwargs
     ):
