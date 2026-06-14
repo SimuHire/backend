@@ -84,6 +84,47 @@ def _extract_json_text(raw_text: str) -> str:
     return text
 
 
+def openai_api_error_summary(exc: BaseException, *, max_len: int = 400) -> str:
+    """Return a single-line, non-secret summary for OpenAI HTTP/API errors."""
+    parts: list[str] = [type(exc).__name__]
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        parts.append(f"http={status}")
+    request_id = getattr(exc, "request_id", None)
+    if isinstance(request_id, str) and request_id.strip():
+        rid = request_id.strip()
+        parts.append(f"request_id={rid[:48]}")
+    body = getattr(exc, "body", None)
+    err_type: str | None = None
+    err_msg: str | None = None
+    if isinstance(body, dict):
+        nested = body.get("error")
+        if isinstance(nested, dict):
+            et = nested.get("type")
+            if isinstance(et, str) and et.strip():
+                err_type = et.strip()[:120]
+            em = nested.get("message")
+            if isinstance(em, str) and em.strip():
+                err_msg = " ".join(em.split())[:240]
+            code = nested.get("code")
+            if isinstance(code, str) and code.strip():
+                parts.append(f"api_error_code={code.strip()[:120]}")
+        if err_type is None:
+            et = body.get("type")
+            if isinstance(et, str) and et.strip():
+                err_type = et.strip()[:120]
+        if err_msg is None:
+            em = body.get("message")
+            if isinstance(em, str) and em.strip():
+                err_msg = " ".join(em.split())[:240]
+    if err_type:
+        parts.append(f"api_error_type={err_type}")
+    if err_msg:
+        parts.append(f"api_error_message={err_msg}")
+    out = "|".join(parts)
+    return out[:max_len]
+
+
 def _openai_schema_validation_error(exc: Exception) -> bool:
     message = str(exc)
     return (
@@ -243,10 +284,10 @@ def call_openai_json_schema(
                 raise
             except Exception as fallback_exc:
                 raise AIProviderExecutionError(
-                    f"openai_request_failed:{type(fallback_exc).__name__}"
+                    f"openai_request_failed:{openai_api_error_summary(fallback_exc)}"
                 ) from fallback_exc
         raise AIProviderExecutionError(
-            f"openai_request_failed:{type(exc).__name__}"
+            f"openai_request_failed:{openai_api_error_summary(exc)}"
         ) from exc
 
     output_text = getattr(response, "output_text", None)
@@ -360,4 +401,5 @@ __all__ = [
     "api_key_configured",
     "call_anthropic_json",
     "call_openai_json_schema",
+    "openai_api_error_summary",
 ]

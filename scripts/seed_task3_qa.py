@@ -17,7 +17,9 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--talent-partner-email",
-        default=os.getenv("QA_E2E_TALENT_PARTNER_EMAIL", "talent_partner1@local.test"),
+        default=os.getenv(
+            "QA_E2E_TALENT_PARTNER_EMAIL", "winoetalentpartner@gmail.com"
+        ),
         help="Must match /api/dev/qa-login default Talent Partner email.",
     )
     return p.parse_args()

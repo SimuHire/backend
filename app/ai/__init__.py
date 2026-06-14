@@ -1,5 +1,14 @@
 """Shared AI runtime helpers for prompt packs, overrides, and structured outputs."""
 
+from .ai_model_preflight_service import (
+    AIModelMatrixRow,
+    AIModelPreflightResult,
+    AIModelPreflightTarget,
+    build_ai_model_matrix_rows,
+    build_ai_model_preflight_targets,
+    verify_ai_model_endpoint,
+    verify_ai_model_preflight,
+)
 from .ai_output_models import (
     AggregatedWinoeReportOutput,
     DayReviewerOutput,
@@ -59,6 +68,9 @@ __all__ = [
     "AIFeatureConfig",
     "AI_AGENT_KEYS",
     "AI_PROMPT_OVERRIDE_KEYS",
+    "AIModelMatrixRow",
+    "AIModelPreflightResult",
+    "AIModelPreflightTarget",
     "AI_RUNTIME_MODE_DEMO",
     "AI_RUNTIME_MODE_REAL",
     "AI_RUNTIME_MODE_TEST",
@@ -74,6 +86,8 @@ __all__ = [
     "WinoeSynthesisDimension",
     "allow_demo_or_test_mode",
     "build_ai_policy_snapshot",
+    "build_ai_model_matrix_rows",
+    "build_ai_model_preflight_targets",
     "build_prompt_pack_entry",
     "build_required_snapshot_prompt",
     "build_snapshot_prompt",
@@ -100,4 +114,6 @@ __all__ = [
     "resolve_runtime_mode",
     "resolve_scenario_generation_config",
     "resolve_transcription_config",
+    "verify_ai_model_endpoint",
+    "verify_ai_model_preflight",
 ]

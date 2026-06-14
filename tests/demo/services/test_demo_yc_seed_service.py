@@ -253,7 +253,7 @@ async def test_seed_demo_cli_creates_complete_dataset_and_is_idempotent(
     task_count = await async_session.scalar(select(func.count()).select_from(Task))
 
     assert company_count == 1
-    assert user_count == 1
+    assert user_count == 2
     assert trial_count == 3
     assert candidate_session_count == 3
     assert submission_count == 6
@@ -275,6 +275,12 @@ async def test_seed_demo_cli_creates_complete_dataset_and_is_idempotent(
         select(User).where(User.email == "winoetalentpartner@gmail.com")
     )
     assert talent_partner is not None
+    candidate_user = await async_session.scalar(
+        select(User).where(User.email == "winoecandidate@gmail.com")
+    )
+    assert candidate_user is not None
+    assert candidate_user.role == "candidate"
+    assert candidate_user.company_id is None
 
     trial = await async_session.scalar(
         select(Trial).where(Trial.title == "Senior Frontend Engineer Trial")
@@ -375,6 +381,7 @@ async def test_seed_demo_cli_creates_complete_dataset_and_is_idempotent(
     )
     assert active_trial is not None
     assert active_trial.status == "active_inviting"
+    assert candidate_sessions[1].candidate_user_id == candidate_user.id
     assert candidate_sessions[1].candidate_email == "winoecandidate@gmail.com"
     assert candidate_sessions[1].status == "in_progress"
     assert candidate_sessions[1].started_at is not None
@@ -514,6 +521,19 @@ async def test_seed_demo_cli_creates_complete_dataset_and_is_idempotent(
         citation.get("artifact_ref") == "[00:00-02:00]"
         for citation in report["citations"]
     )
+    forbidden_phrases = (
+        "re" + "ject",
+        "fail",
+        "failed",
+        "not good enough",
+        "do not hire",
+        "no hire",
+    )
+    narrative_text = " ".join(
+        str(report.get(field) or "")
+        for field in ("verdictOneLiner", "narrativeAssessment")
+    ).lower()
+    assert not any(phrase in narrative_text for phrase in forbidden_phrases)
     for reviewer_report in report["reviewerReports"]:
         assert reviewer_report["dimensionalScores"]
         assert len(reviewer_report["dimensionalScores"]) >= 8
@@ -636,12 +656,15 @@ async def test_seed_demo_citation_refs_resolve_to_seeded_artifacts(
     day5_range = re.search(r":L(\d+)-L(\d+)$", day5_ref)
     assert day1_range is not None
     assert day5_range is not None
-    assert day1_citation["view_url"].endswith(
-        f"range={day1_range.group(1)}-{day1_range.group(2)}"
+    assert day1_citation["view_url"] == f"/api/submissions/{day1_submission.id}"
+    assert day1_citation["artifact_range"] == (
+        f"L{day1_range.group(1)}-L{day1_range.group(2)}"
     )
-    assert day4_citation["view_url"].endswith("range=00:00-02:00")
-    assert day5_citation["view_url"].endswith(
-        f"range={day5_range.group(1)}-{day5_range.group(2)}"
+    assert day4_citation["view_url"] == f"/api/submissions/{day4_submission.id}"
+    assert day4_citation["artifact_range"] == "00:00-02:00"
+    assert day5_citation["view_url"] == f"/api/submissions/{day5_submission.id}"
+    assert day5_citation["artifact_range"] == (
+        f"L{day5_range.group(1)}-L{day5_range.group(2)}"
     )
 
     day1_text = day1_submission.content_text or ""
@@ -663,25 +686,57 @@ async def test_seed_demo_citation_refs_resolve_to_seeded_artifacts(
     )
 
     repo_full_name = workspace.repo_full_name
-    day2_code_ref = next(
-        ref
-        for ref in citation_by_ref
-        if ref.startswith(tuple("0123456789abcdef")) and ":src/api/trials.ts:" in ref
-    )
-    day3_code_ref = next(
-        ref
-        for ref in citation_by_ref
-        if ref.startswith(tuple("0123456789abcdef"))
-        and ":src/services/reporting.py:" in ref
-    )
-    for ref in (day2_code_ref, day3_code_ref):
+    for citation in citations:
+        ref = citation["artifact_ref"]
+        resolved = citation["view_url"]
+        assert isinstance(resolved, str) and resolved
+        assert citation["resolved_open_target"] == resolved
+        assert citation["artifact_range"] is not None
+        if ref.startswith("["):
+            assert citation["artifact_type"] == "transcript"
+            assert resolved == f"/api/submissions/{day4_submission.id}"
+            continue
+        if (
+            ref.startswith("day1")
+            or ref.startswith("day3")
+            or ref.startswith("day4")
+            or ref.startswith("day5")
+        ):
+            submission = (
+                day1_submission
+                if ref.startswith("day1")
+                else day5_submission
+                if ref.startswith("day5")
+                else day4_submission
+                if ref.startswith("day4")
+                else await async_session.scalar(
+                    select(Submission)
+                    .join(Task, Task.id == Submission.task_id)
+                    .where(
+                        Submission.candidate_session_id == candidate_session.id,
+                        Task.day_index == 3,
+                    )
+                )
+            )
+            assert submission is not None
+            range_match = re.search(r":L(\d+)-L(\d+)$", ref)
+            assert range_match is not None
+            start_line = int(range_match.group(1))
+            end_line = int(range_match.group(2))
+            assert resolved == f"/api/submissions/{submission.id}"
+            if ref.startswith("day1") or ref.startswith("day5"):
+                snippet = _line_slice(
+                    submission.content_text or "", start_line, end_line
+                )
+                assert snippet.strip()
+            continue
         commit_sha, path_and_range = ref.split(":", 1)
         path = path_and_range.split(":L", 1)[0]
         commit = await fake_github_client.get_commit(repo_full_name, commit_sha)
         assert commit["message"] != "demo commit"
-        assert commit["parents"]
+        compare_base = commit["parents"][0]["sha"] if commit["parents"] else "base"
         compare = await fake_github_client.get_compare(
-            repo_full_name, commit["parents"][0]["sha"], commit_sha
+            repo_full_name, compare_base, commit_sha
         )
         assert any(file["filename"] == path for file in compare["files"])
 
@@ -1244,5 +1299,106 @@ async def test_clear_demo_scope_nulls_trial_fk_before_scenario_version_delete(
         for i, call in enumerate(session.calls)
         if "DELETE FROM scenario_versions" in call
     )
+    trial_delete_index = next(
+        i for i, call in enumerate(session.calls) if "DELETE FROM trials" in call
+    )
+    user_delete_index = next(
+        i for i, call in enumerate(session.calls) if "DELETE FROM users" in call
+    )
     assert evaluation_state_delete_index < candidate_session_delete_index
     assert trial_update_index < scenario_delete_index
+    assert trial_delete_index < user_delete_index
+
+
+@pytest.mark.asyncio
+async def test_clear_demo_scope_preserves_user_with_non_demo_trial(async_session):
+    from app.demo.services.yc_demo_seed_service import _clear_demo_scope
+
+    user = await create_talent_partner(
+        async_session,
+        email="winoetalentpartner@gmail.com",
+    )
+    demo_trial, _ = await create_trial(
+        async_session,
+        created_by=user,
+        title="Senior Frontend Engineer Trial",
+        company_context={"demoMode": "yc-demo"},
+    )
+    non_demo_trial, _ = await create_trial(
+        async_session,
+        created_by=user,
+        title="Customer Trial",
+        company_context={"demoMode": "customer-data"},
+    )
+    await async_session.commit()
+
+    await _clear_demo_scope(
+        async_session,
+        SimpleNamespace(
+            trial_title="Senior Frontend Engineer Trial",
+            company_name="Northstar Labs",
+            talent_partner_email="winoetalentpartner@gmail.com",
+        ),
+    )
+
+    assert (
+        await async_session.scalar(select(User).where(User.id == user.id))
+    ) is not None
+    assert (
+        await async_session.scalar(select(Trial).where(Trial.id == non_demo_trial.id))
+    ) is not None
+    assert (
+        await async_session.scalar(select(Trial).where(Trial.id == demo_trial.id))
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_seed_demo_reuses_preserved_company_and_user_with_non_demo_trial(
+    async_session,
+):
+    from app.demo.services.yc_demo_seed_service import (
+        DemoSeedConfig,
+        seed_yc_demo_dataset,
+    )
+
+    company = Company(name="Northstar Labs")
+    async_session.add(company)
+    await async_session.flush()
+    user = User(
+        name="Existing Talent Partner",
+        email="winoetalentpartner@gmail.com",
+        role="talent_partner",
+        company_id=company.id,
+        password_hash="",
+    )
+    async_session.add(user)
+    await async_session.flush()
+    non_demo_trial, _ = await create_trial(
+        async_session,
+        created_by=user,
+        title="Customer Trial",
+        company_context={"demoMode": "customer-data"},
+    )
+    await async_session.commit()
+
+    await seed_yc_demo_dataset(
+        async_session,
+        config=DemoSeedConfig(),
+        github_client=FakeGithubClient(),
+    )
+
+    company_count = await async_session.scalar(
+        select(func.count())
+        .select_from(Company)
+        .where(Company.name == "Northstar Labs")
+    )
+    user_count = await async_session.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.email == "winoetalentpartner@gmail.com")
+    )
+    assert company_count == 1
+    assert user_count == 1
+    assert (
+        await async_session.scalar(select(Trial).where(Trial.id == non_demo_trial.id))
+    ) is not None

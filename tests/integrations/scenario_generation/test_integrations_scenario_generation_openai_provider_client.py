@@ -97,6 +97,8 @@ def test_openai_scenario_generation_provider_maps_success_and_errors(
 
     provider = OpenAIScenarioGenerationProvider()
     request = ScenarioGenerationProviderRequest(
+        agent_key="prestart",
+        fallback_provider="openai",
         system_prompt="system",
         user_prompt="user",
         model="gpt-test",

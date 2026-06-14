@@ -10,6 +10,9 @@ from app.integrations.winoe_report_review import (
     WinoeReportReviewProviderError,
 )
 from app.integrations.winoe_report_review import (
+    anthropic_provider_client as anthropic_provider_module,
+)
+from app.integrations.winoe_report_review import (
     openai_provider_client as provider_module,
 )
 
@@ -97,6 +100,55 @@ def _aggregated_output(*, reason: str | None = None) -> AggregatedWinoeReportOut
     )
 
 
+def test_anthropic_winoe_report_review_day_falls_back_to_openai_on_retryable_error(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def _fake_anthropic_json(**kwargs):
+        calls.append(("anthropic", kwargs["model"]))
+        raise AIProviderExecutionError("anthropic_request_failed:RateLimitError")
+
+    def _fake_openai_json_schema(**kwargs):
+        calls.append(("openai", kwargs["model"]))
+        return _reviewer_output()
+
+    monkeypatch.setattr(
+        anthropic_provider_module, "call_anthropic_json", _fake_anthropic_json
+    )
+    monkeypatch.setattr(
+        anthropic_provider_module, "call_openai_json_schema", _fake_openai_json_schema
+    )
+    monkeypatch.setattr(
+        anthropic_provider_module.settings, "ANTHROPIC_API_KEY", "anthropic-test-key"
+    )
+    monkeypatch.setattr(
+        anthropic_provider_module.settings, "OPENAI_API_KEY", "openai-test-key"
+    )
+    monkeypatch.setattr(
+        anthropic_provider_module.settings,
+        "WINOE_REPORT_DAY1_FALLBACK_MODEL",
+        "gpt-5.5",
+    )
+
+    provider = anthropic_provider_module.AnthropicWinoeReportReviewProvider()
+    result = provider.review_day(
+        request=WinoeReportDayReviewRequest(
+            agent_key="designDocReviewer",
+            fallback_provider="openai",
+            system_prompt="system",
+            user_prompt="user",
+            model="claude-sonnet-4-6",
+        )
+    )
+
+    assert result.dayIndex == 2
+    assert calls == [
+        ("anthropic", "claude-sonnet-4-6"),
+        ("openai", "gpt-5.5"),
+    ]
+
+
 @pytest.mark.asyncio
 async def test_openai_winoe_report_review_day_falls_back_to_anthropic_on_retryable_error(
     monkeypatch,
@@ -121,13 +173,15 @@ async def test_openai_winoe_report_review_day_falls_back_to_anthropic_on_retryab
     )
     monkeypatch.setattr(
         provider_module.settings,
-        "WINOE_REPORT_ANTHROPIC_FALLBACK_DAY_MODEL",
+        "WINOE_REPORT_DAY23_FALLBACK_MODEL",
         "claude-haiku-4-5",
     )
 
     provider = provider_module.OpenAIWinoeReportReviewProvider()
     result = provider.review_day(
         request=WinoeReportDayReviewRequest(
+            agent_key="codeImplementationReviewer",
+            fallback_provider="anthropic",
             system_prompt="system",
             user_prompt="user",
             model="gpt-5.2-codex",
@@ -139,6 +193,43 @@ async def test_openai_winoe_report_review_day_falls_back_to_anthropic_on_retryab
         ("openai", "gpt-5.2-codex"),
         ("anthropic", "claude-haiku-4-5"),
     ]
+
+
+def test_openai_winoe_report_review_day_logs_served_fallback_model(
+    monkeypatch, caplog
+) -> None:
+    def _fake_openai_json_schema(**kwargs):
+        raise AIProviderExecutionError("openai_request_failed:RateLimitError")
+
+    def _fake_anthropic_json(**kwargs):
+        return _reviewer_output()
+
+    monkeypatch.setattr(
+        provider_module, "call_openai_json_schema", _fake_openai_json_schema
+    )
+    monkeypatch.setattr(provider_module, "call_anthropic_json", _fake_anthropic_json)
+    monkeypatch.setattr(provider_module.settings, "OPENAI_API_KEY", "openai-test-key")
+    monkeypatch.setattr(
+        provider_module.settings, "ANTHROPIC_API_KEY", "anthropic-test-key"
+    )
+    monkeypatch.setattr(
+        provider_module.settings,
+        "WINOE_REPORT_DAY23_FALLBACK_MODEL",
+        "claude-haiku-4-5",
+    )
+
+    with caplog.at_level("INFO"):
+        provider_module.OpenAIWinoeReportReviewProvider().review_day(
+            request=WinoeReportDayReviewRequest(
+                agent_key="codeImplementationReviewer",
+                fallback_provider="anthropic",
+                system_prompt="system",
+                user_prompt="user",
+                model="gpt-5.2-codex",
+            )
+        )
+
+    assert "served_model=claude-haiku-4-5" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -165,13 +256,15 @@ async def test_openai_winoe_report_aggregate_falls_back_to_anthropic_on_retryabl
     )
     monkeypatch.setattr(
         provider_module.settings,
-        "WINOE_REPORT_ANTHROPIC_FALLBACK_AGGREGATOR_MODEL",
+        "WINOE_REPORT_AGGREGATOR_FALLBACK_MODEL",
         "claude-sonnet-4-6",
     )
 
     provider = provider_module.OpenAIWinoeReportReviewProvider()
     result = provider.aggregate_winoe_report(
         request=WinoeReportAggregateRequest(
+            agent_key="winoeReport",
+            fallback_provider="anthropic",
             system_prompt="system",
             user_prompt="user",
             model="gpt-5.2",
@@ -217,13 +310,15 @@ async def test_openai_winoe_report_aggregate_accepts_long_anthropic_day_reason(
     )
     monkeypatch.setattr(
         provider_module.settings,
-        "WINOE_REPORT_ANTHROPIC_FALLBACK_AGGREGATOR_MODEL",
+        "WINOE_REPORT_AGGREGATOR_FALLBACK_MODEL",
         "claude-sonnet-4-6",
     )
 
     provider = provider_module.OpenAIWinoeReportReviewProvider()
     result = provider.aggregate_winoe_report(
         request=WinoeReportAggregateRequest(
+            agent_key="winoeReport",
+            fallback_provider="anthropic",
             system_prompt="system",
             user_prompt="user",
             model="gpt-5.2",

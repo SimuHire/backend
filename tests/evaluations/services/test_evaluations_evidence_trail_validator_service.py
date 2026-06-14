@@ -48,6 +48,57 @@ def test_validate_duplicate_citations_do_not_satisfy_coverage() -> None:
     assert any("Architecture & Design" in error for error in result.errors)
 
 
+def test_validate_dimension_without_any_citations_fails() -> None:
+    report = _valid_report()
+    report["dimensions"] = [
+        {
+            "name": "Architecture & Design",
+            "score": 8.5,
+            "justification": "Grounded in the design doc.",
+        }
+    ]
+    report["citations"] = [
+        citation
+        for citation in report["citations"]
+        if citation["dimension"] != "Architecture & Design"
+    ]
+
+    result = validate_winoe_report_evidence_trail(report, bundle=_bundle())
+
+    assert result.passed is False
+    assert any("has only 0 citations" in error for error in result.errors)
+
+
+def test_validate_dimension_with_only_non_resolving_citations_fails() -> None:
+    report = _valid_report()
+    report["dimensions"] = [
+        {
+            "name": "Architecture & Design",
+            "score": 8.5,
+            "justification": "Grounded in the design doc.",
+        }
+    ]
+    report["citations"] = [
+        {
+            "dimension": "Architecture & Design",
+            "artifact_type": "design_doc",
+            "artifact_ref": "missing-design-doc.md:L1-L2",
+            "excerpt": "Broken citation.",
+        },
+        {
+            "dimension": "Architecture & Design",
+            "artifact_type": "design_doc",
+            "artifact_ref": "missing-design-doc.md:L3-L4",
+            "excerpt": "Broken citation.",
+        },
+    ]
+
+    result = validate_winoe_report_evidence_trail(report, bundle=_bundle())
+
+    assert result.passed is False
+    assert any("Unresolvable" in error for error in result.errors)
+
+
 def test_validate_broken_citation_range_fails() -> None:
     report = _valid_report()
     report["citations"] = [

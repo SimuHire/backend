@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import fields
 from types import SimpleNamespace
 
@@ -9,7 +10,10 @@ import pytest
 from app.ai import (
     AIPolicySnapshotError,
     build_ai_policy_snapshot,
+    compute_ai_policy_snapshot_basis_fingerprint,
+    compute_ai_policy_snapshot_digest,
 )
+from app.ai.ai_provider_clients_service import AIProviderExecutionError
 from app.evaluations.repositories.evaluations_repositories_evaluations_core_model import (
     EVALUATION_RECOMMENDATION_NO_HIRE,
 )
@@ -28,7 +32,16 @@ from app.evaluations.services.evaluations_services_evaluations_evaluator_models_
     DayEvaluationResult,
     ReviewerReportResult,
 )
+from app.integrations.winoe_report_review import (
+    anthropic_provider_client as winoe_anthropic_provider,
+)
+from app.integrations.winoe_report_review import (
+    openai_provider_client as winoe_openai_provider,
+)
 from tests.evaluations.services.evaluations_evaluator_branch_gap_utils import day_input
+from tests.evaluations.services.evaluations_winoe_report_fixtures_utils import (
+    build_valid_winoe_report_json,
+)
 from tests.shared.factories import build_trial_agent_snapshots
 
 
@@ -174,6 +187,146 @@ async def test_live_evaluator_rejects_snapshot_contract_mismatch():
         match="scenario_version_ai_policy_snapshot_agent_contract_mismatch",
     ):
         await evaluator.get_winoe_report_evaluator().evaluate(bundle)
+
+
+@pytest.mark.asyncio
+async def test_live_evaluator_falls_back_once_and_completes(
+    monkeypatch,
+):
+    snapshot = _snapshot()
+    for agent in snapshot["agents"].values():
+        agent["runtime"]["runtimeMode"] = "real"
+    snapshot["snapshotDigest"] = compute_ai_policy_snapshot_basis_fingerprint(snapshot)
+    monkeypatch.setattr(
+        winoe_openai_provider.settings,
+        "OPENAI_API_KEY",
+        "openai-test-key",
+    )
+    monkeypatch.setattr(
+        winoe_openai_provider.settings,
+        "ANTHROPIC_API_KEY",
+        "anthropic-test-key",
+    )
+    day1_text = "\n".join(f"design line {index}" for index in range(1, 9))
+    day2_text = "\n".join(f"implementation line {index}" for index in range(1, 9))
+    day3_text = "\n".join(f"code quality line {index}" for index in range(1, 9))
+    day5_text = "\n".join(f"reflection line {index}" for index in range(1, 9))
+    bundle = evaluator.EvaluationInputBundle(
+        candidate_session_id=10,
+        scenario_version_id=20,
+        model_name="gpt-5.2",
+        model_version="gpt-5.2",
+        prompt_version="winoe-ai-pack-v4:winoeReport",
+        rubric_version="winoe-ai-pack-v4:winoeReport:rubric",
+        disabled_day_indexes=[],
+        day_inputs=[
+            day_input(day_index=1, content_text=day1_text),
+            day_input(
+                day_index=2,
+                content_text=day2_text,
+                repo_full_name="acme/repo",
+                commit_sha="abc1234",
+                cutoff_commit_sha="cutoff-day2-fixed",
+                diff_summary={"base": "base", "head": "head"},
+                tests_passed=3,
+                tests_failed=0,
+            ),
+            day_input(
+                day_index=3,
+                content_text=day3_text,
+                repo_full_name="acme/repo",
+                commit_sha="def5678",
+                cutoff_commit_sha="cutoff-day3-fixed",
+                diff_summary={"base": "base", "head": "head"},
+                tests_passed=4,
+                tests_failed=0,
+            ),
+            day_input(
+                day_index=4,
+                transcript_segments=[
+                    {"startMs": 120000, "endMs": 128000, "text": "Handoff walkthrough"},
+                    {"startMs": 128000, "endMs": 136000, "text": "Evidence summary"},
+                ],
+            ),
+            day_input(day_index=5, content_text=day5_text),
+        ],
+        code_implementation_evidence=CodeImplementationEvidenceContext(
+            repository_snapshot={
+                "daySubmissionRefs": [
+                    {"commitSha": "abc1234"},
+                    {"commitSha": "def5678"},
+                ]
+            },
+            commit_history=[
+                {"sha": "abc1234", "filesChangedPaths": ["src/a.ts"]},
+                {"sha": "def5678", "filesChangedPaths": ["src/b.ts"]},
+            ],
+            file_creation_timeline=[
+                {"path": "src/a.ts"},
+                {"path": "src/b.ts"},
+            ],
+        ),
+        ai_policy_snapshot_json=snapshot,
+        ai_policy_snapshot_digest=snapshot["snapshotDigest"],
+        trial_context_json={"trialId": 1, "title": "Demo Trial"},
+    )
+    calls: list[tuple[str, str, str]] = []
+    failed_once = False
+
+    def _reviewer_output(day_index: int):
+        return {
+            "dayIndex": day_index,
+            "score": 0.8,
+            "summary": f"Day {day_index} stayed evidence-backed.",
+            "rubricBreakdown": {"signal": 0.8},
+            "evidence": [],
+            "strengths": ["Clear signal"],
+            "risks": ["Minor follow-up"],
+        }
+
+    def _extract_day_index(prompt: str) -> int:
+        match = re.search(r'"dayIndex"\s*:\s*(\d+)', prompt)
+        return int(match.group(1)) if match is not None else 2
+
+    def _fake_openai_json_schema(**kwargs):
+        nonlocal failed_once
+        calls.append(("openai", kwargs["model"], kwargs["response_model"].__name__))
+        if kwargs["response_model"].__name__ == "DayReviewerOutput":
+            if not failed_once:
+                failed_once = True
+                raise AIProviderExecutionError("openai_request_failed:RateLimitError")
+            return kwargs["response_model"].model_validate(
+                _reviewer_output(_extract_day_index(kwargs["user_prompt"]))
+            )
+        return kwargs["response_model"].model_validate(build_valid_winoe_report_json())
+
+    def _fake_anthropic_json(**kwargs):
+        calls.append(("anthropic", kwargs["model"], kwargs["response_model"].__name__))
+        if kwargs["response_model"].__name__ == "DayReviewerOutput":
+            return kwargs["response_model"].model_validate(
+                _reviewer_output(_extract_day_index(kwargs["user_prompt"]))
+            )
+        return kwargs["response_model"].model_validate(build_valid_winoe_report_json())
+
+    monkeypatch.setattr(
+        winoe_openai_provider, "call_openai_json_schema", _fake_openai_json_schema
+    )
+    monkeypatch.setattr(
+        winoe_openai_provider, "call_anthropic_json", _fake_anthropic_json
+    )
+    monkeypatch.setattr(
+        winoe_anthropic_provider, "call_anthropic_json", _fake_anthropic_json
+    )
+    monkeypatch.setattr(
+        winoe_anthropic_provider, "call_openai_json_schema", _fake_openai_json_schema
+    )
+
+    result = await evaluator.get_winoe_report_evaluator().evaluate(bundle)
+
+    assert result.day_results
+    assert result.report_json["citations"]
+    assert ("openai", "gpt-5.5", "DayReviewerOutput") in calls
+    assert any(entry[0] == "anthropic" for entry in calls)
 
 
 def test_deterministic_winoe_report_emits_unique_real_citations():
