@@ -1,193 +1,186 @@
-# Task 2 — Demo Seed + FakeGitHubProvider Hardening
+# Task 3: Harden AI pipeline integrity, citation resolution, validator enforcement, and demo QA seeds
 
 ## Summary
 
-Task 2 hardens the Winoe AI demo foundation by making the seed deterministic, idempotent, and centered on the canonical Talent Partner and candidate credentials. It also hardens the fake GitHub layer so demo workflow dispatch, Codespace state, and artifact progression are reproducible without real GitHub access.
+This PR completes the backend trust spine for Task 3: AI Pipeline Integrity. It adds model/provider preflight, explicit model and capability validation, a richer Citation API, Evidence Trail target resolution, validator enforcement for cited scoring evidence, Winoe persona/SOUL prompt assembly coverage, AgentSnapshot/fairness preservation, Winoe evaluation state-machine coverage, and deterministic demo/Task 3 seed data for the required QA credentials.
 
-## Why This Matters
+The backend changes keep Winoe evidence-first. Winoe provides evidence for the Talent Partner to decide; it does not make hiring decisions.
 
-This gives the YC demo a stable, repeatable baseline:
+## Why this matters
 
-- the Talent Partner path starts from `winoetalentpartner@gmail.com`
-- the active candidate path starts from `winoecandidate@gmail.com`
-- the seeded data is consistent across reruns
-- fake workflow state progression can be verified without external dependencies
-- production remains protected from demo-only execution
+Winoe AI cannot be trusted if Winoe Scores lack defensible Evidence Trail support. Every score needs to be tied to real artifacts, Talent Partners need to inspect the resolved targets, and Candidate access must remain denied for Talent Partner-only reports and artifacts.
 
-## Scope
+The deterministic seed path also matters for YC/demo QA. QA should not depend on fragile local database state, drifting ownership, invalid local emails, or cleanup failures.
 
-- Recenter the demo seed around the canonical Talent Partner credential.
-- Recenter the active candidate demo path around the canonical candidate credential.
-- Produce a deterministic and idempotent demo dataset.
-- Hardcode the demo-critical evaluator and Winoe Report output so seed execution does not depend on live LLM calls.
-- Harden `FakeGitHubProvider` / `FakeGithubClient` for deterministic repo creation, from-scratch workspace bootstrap, Codespace state, run-tests workflow dispatch, queued -> running -> completed progression, success and failure paths, artifact zip availability after completion, and commit/compare/file evidence.
-- Preserve terminal `dispatch_and_wait` behavior.
-- Confirm `DEMO_MODE` refuses production.
-- Confirm no real GitHub or Codespace calls occur in `DEMO_MODE`.
+## Backend changes
 
-## Backend Changes
+### A. Model preflight / provider capability integrity
 
-### Demo Seed
+- Adds `app/ai/ai_model_preflight_service.py` and `scripts/verify_models.py`.
+- Verifies configured models are reachable through the production provider paths.
+- Makes capability validation explicit for `structured_json` and `transcription`.
+- Covers OpenAI structured JSON probes, Anthropic structured JSON probes, and OpenAI transcription probes.
+- Rejects blank primary/fallback model config and unsupported fallback provider config.
+- Sanitizes provider failure summaries so API keys/secrets are not printed.
+- Pins/documents the model matrix used by reviewer, Winoe, scenario generation, and transcription roles.
 
-- The seed now produces a single, canonical demo story instead of a loose or partially populated dataset.
-- The seed is deterministic and idempotent: reruns clear stale demo rows and reseed the same final identities and artifacts.
-- The active candidate path is anchored on `winoecandidate@gmail.com` and reaches Nina Alvarez's Day 2 state.
-- The Talent Partner path is anchored on `winoetalentpartner@gmail.com` and reaches the populated dashboard plus the completed hero Trial.
+### B. Citation API / Evidence Trail resolution
 
-### Demo Dataset Inventory
+- Extends the Winoe Report citation payload with `citation_id`, `dimension`, `artifact_range`, and `resolved_open_target`.
+- Resolves `resolved_open_target` and `view_url` to real `/api/submissions/{id}` targets.
+- Stops emitting fake `/view?...` target shapes.
+- Preserves line/timestamp metadata in `artifact_range`.
+- Expands target coverage across design doc, code implementation, transcript, and reflection artifacts.
 
-The final seeded inventory contains exactly:
+### C. Validator enforcement
 
-- 1 Talent Partner
-- 3 Trials
-- 3 candidate sessions
-- 6 submissions
-- 2 workspaces
-- 2 workspace groups
-- 1 recording asset
-- 1 transcript
-- 1 evaluation run
-- 5 day scores
-- 5 reviewer reports
-- 1 Winoe Report
-- 15 Evidence Trail citations
+- Rejects dimensional scoring evidence without citations.
+- Rejects dimensional scoring evidence with only unresolved/non-resolving citations.
+- Keeps the valid cited evidence path accepted.
 
-### Credential Story
+### D. Persona/SOUL governance
 
-- Talent Partner: `winoetalentpartner@gmail.com`
-- Candidate: `winoecandidate@gmail.com`
-- Candidate path resolves to Nina Alvarez on Day 2
+- Verifies Winoe prompt assembly includes persona/SOUL content.
+- Keeps Winoe evidence-first.
+- Preserves the boundary that Winoe does not make hiring decisions.
+- Keeps evidence with Winoe and the decision with the Talent Partner.
 
-### Completed Hero Trial
+### E. AgentSnapshot / fairness
 
-The completed hero Trial is the Sarah Chen path:
+- Confirms candidates in the same Trial use pinned agent/rubric/model snapshots.
+- Preserves the fairness architecture by avoiding live prompt-pack drift during reruns.
 
-- completed Trial state
-- finished Winoe Report
-- deterministic evaluation output
-- evidence-backed narrative and score artifacts
+### F. Evaluation state-machine
 
-### Evidence Trail
+State-machine coverage now verifies the ordered Task 3 path:
 
-The seed includes realistic five-day artifacts:
+- `REVIEWERS_DISPATCHED`
+- `REVIEWERS_COMPLETE`
+- `WINOE_SYNTHESIZING`
+- `EVIDENCE_TRAIL_VALIDATING`
+- `REPORT_FINALIZED`
+- `NOTIFICATION_SENT`
 
-- Day 1 Design Doc
-- Day 2 Implementation Kickoff
-- Day 3 Implementation Wrap-Up
-- Day 4 Handoff/Demo recording plus transcript
-- Day 5 Reflection
+### G. Demo / Task 3 seed reliability
 
-The Evidence Trail citations resolve against seeded rows and payloads, not just citation-shaped strings. The proof includes:
+- Keeps `seed_demo.sh` idempotent.
+- Keeps `seed_task3_qa.py` idempotent.
+- Aligns the required Talent Partner with the seeded Winoe Report company.
+- Ensures the required Candidate exists as a backend candidate user.
+- Avoids `.local.test` validation failures by using valid example-domain addresses.
+- Avoids FK cleanup failure.
+- Keeps candidate listing returning 200.
+- Prevents seed ownership drift across repeated runs.
 
-- `day1-design-doc.md:L1-L20`
-- `day1-design-doc.md:L21-L36`
-- Day 2 and Day 3 repo commit/file/test evidence
-- Day 4 transcript and recording evidence
-- `day5-reflection.md:L1-L18`
-- `day5-reflection.md:L19-L34`
+## Security / authorization
 
-### FakeGitHubProvider / FakeGithubClient
+- No authorization checks were weakened.
+- The required Talent Partner can access only company-owned Winoe Report, citation, and submission resources.
+- Candidate remains denied from Talent Partner-only Winoe Report, Citation API, and submission targets.
+- Unauthenticated access remains denied.
+- Provider secrets are not printed in preflight output.
 
-The fake GitHub layer now behaves deterministically for the demo-critical path:
+## QA evidence
 
-- repository creation is stable
-- from-scratch workspace bootstrap is stable
-- Codespace state is stable
-- `run-tests` workflow dispatch is stable
-- workflow progression is `queued -> running -> completed`
-- success and failure paths are covered
-- artifact zips become available after completion
-- commit, compare, and file evidence are available to the seed and report pipeline
+```text
+Model preflight: PASS
+Seed sequence:
+- ./scripts/seed_demo.sh: PASS
+- ./scripts/seed_demo.sh: PASS
+- poetry run python3 scripts/seed_task3_qa.py --talent-partner-email winoetalentpartner@gmail.com: PASS
+- poetry run python3 scripts/seed_task3_qa.py --talent-partner-email winoetalentpartner@gmail.com: PASS
 
-Terminal `dispatch_and_wait` behavior is preserved. It now waits through terminal completion and returns parsed terminal results instead of stopping at the first running observation.
-
-### DEMO_MODE Production Safety
-
-- `DEMO_MODE` is refused in production.
-- The production guard fails closed with `ValidationError: DEMO_MODE/WINOE_DEMO_MODE cannot be enabled in production.`
-- The demo seed path uses the fake provider only in `DEMO_MODE`.
-- No real GitHub or Codespace calls occur in `DEMO_MODE`.
-
-## What Did Not Change
-
-- No frontend UI implementation was added in this task.
-- No live LLM dependency was introduced into the seed path.
-- No production behavior was loosened.
-- No unrelated product areas were changed.
-
-## Verification
-
-### Seed Commands
-
-```bash
-WINOE_ENV=local \
-WINOE_DEMO_MODE=true \
-WINOE_AI_RUNTIME_MODE=demo \
-GITHUB_PROVIDER=fake \
-DEMO_RESET_DB=1 \
-./scripts/seed_demo.sh --reset-db
+Backend server: PASS at http://127.0.0.1:8000
+Backend health: GET /health -> 200 {"status":"ok"}
+Talent Partner E2E: PASS
+Candidate boundary: PASS
+Citation API: PASS
+Citation count: 15
+Unique citation targets: 4
+Citation targets: 4/4 unique targets returned 200 for Talent Partner, 403 for Candidate, 401 for unauthenticated
+Validator tests: PASS
+Persona/SOUL tests: PASS
+AgentSnapshot/fairness tests: PASS
+State-machine coverage: PASS
+Backend precommit: PASS, 2233 passed, coverage 96.16%
 ```
 
-### Seed Timing
+## Citation verification table
 
-- Seed run 1: `elapsed_seconds=2.56`
-- Seed run 2: `elapsed_seconds=2.41`
+| Artifact | Ref | Range | Target | Talent Partner | Unauth | Candidate |
+|---|---|---:|---|---:|---:|---:|
+| Design doc | `day1-design-doc.md:L1-L20` | `L1-L20` | `/api/submissions/85` | 200 | 401 | 403 |
+| Code implementation | `857cd1e...:src/services/reporting.py:L12-L76` | `L12-L76` | `/api/submissions/87` | 200 | 401 | 403 |
+| Transcript | `[00:00-02:00]` | `00:00-02:00` | `/api/submissions/88` | 200 | 401 | 403 |
+| Reflection | `day5-reflection.md:L1-L18` | `L1-L18` | `/api/submissions/89` | 200 | 401 | 403 |
 
-### Idempotency
+All citation targets use `/api/submissions/{id}`. No citation target includes `/view`. `artifact_range` preserves line/timestamp ranges.
 
-- Seed run 1: PASS
-- Seed run 2 / idempotency: PASS
-- Both runs completed successfully with exit code `0`
-- The second run reproduced the same identities, Trial structure, and inventory counts
-- Demo-scoped cleanup removed stale demo rows before reseeding
-
-### Automated Checks
-
-- Backend local checks: PASS
-- `2205 passed`
-- `96.16%` coverage
-- Backend terminology guard: PASS
-- Fake-provider focused test: PASS
-
-### Real Local QA
-
-- Real local QA: PASS after Iteration 4
-- Task 2 QA evidence folder: `qa_artifacts/task2_demo_seed_fakegithub_qa/qa_report.md`
-- The browser-visible queued/running state is non-blocking for this task and is deferred to Task 8 candidate UI polish
-
-### Production Guard
+## Test plan
 
 ```bash
-env WINOE_ENV=production WINOE_DEMO_MODE=true WINOE_AI_RUNTIME_MODE=demo GITHUB_PROVIDER=fake ./scripts/seed_demo.sh --reset-db
+poetry run python3 scripts/verify_models.py
+
+./scripts/seed_demo.sh
+./scripts/seed_demo.sh
+poetry run python3 scripts/seed_task3_qa.py --talent-partner-email winoetalentpartner@gmail.com
+poetry run python3 scripts/seed_task3_qa.py --talent-partner-email winoetalentpartner@gmail.com
+
+poetry run pytest --no-cov \
+  tests/ai/test_ai_model_preflight_service.py \
+  tests/ai/test_ai_provider_clients_service.py \
+  tests/evaluations/services/test_evaluations_evidence_trail_validator_service.py \
+  tests/evaluations/routes/test_evaluations_winoe_report_citations_routes.py \
+  tests/evaluations/services/test_evaluations_trial_evaluator_service.py \
+  tests/evaluations/services/test_evaluations_evaluator_runner_service.py \
+  tests/trials/services/test_trials_service_trial_agent_snapshots_service.py \
+  tests/demo/services/test_demo_yc_seed_service.py \
+  tests/demo/services/test_demo_task3_local_qa_seed_service.py \
+  -q
+
+bash precommit.sh
 ```
 
-- Result: PASS expected failure
-- Failure reason: `ValidationError: DEMO_MODE/WINOE_DEMO_MODE cannot be enabled in production.`
+Observed results:
 
-### Terminology Guard
+- Targeted backend pytest: `102 passed`
+- Backend precommit: `2233 passed`, coverage `96.16%`
 
-- Backend terminology guard: PASS
+## Manual QA
 
-## QA Result
+Backend server command:
 
-PASS
+```bash
+WINOE_ENV=local DEV_AUTH_BYPASS=1 WINOE_DEV_AUTH_BYPASS=1 poetry run uvicorn app.api.main:app --reload --host 127.0.0.1 --port 8000
+```
 
-Task 2 implementation is accepted and QA is accepted.
+Manual QA covered:
 
-## Known Limitations / Follow-ups
+- Talent Partner completed dashboard -> Trial detail -> Winoe Report path passed.
+- Winoe Report rendered Winoe Score, all 8 dimensions/sub-scores, and evidence controls.
+- Citation API returned 200 for Talent Partner.
+- Talent Partner citation target requests returned 200.
+- Candidate citation target requests returned 403.
+- Unauthenticated citation target requests returned 401.
+- Candidate portal rendered.
+- Candidate was blocked from Talent Partner-only Winoe Report, Citation API, and submission artifacts.
 
-- Browser-visible queued/running affordance is deferred to Task 8 candidate UI polish.
-- The fake provider covers the demo-critical path, not the full GitHub API surface.
-- The seed uses pre-baked deterministic evaluator and Winoe Report output by design.
+## Risks / non-blocking notes
 
-## Reviewer Checklist
+- No product risk was found in the Task 3 trust path.
+- Local/dev hydration mismatch warnings were observed in browser QA.
+- Existing frontend test-console warnings for React key/fake timer cleanup are outside backend PR scope.
 
-- [ ] Seed creates one Talent Partner and three Trials
-- [ ] Talent Partner credential reaches populated dashboard
-- [ ] Candidate credential reaches Nina Alvarez Day 2
-- [ ] Sarah Chen Winoe Report is ready
-- [ ] Evidence Trail citations resolve
-- [ ] Fake run-tests reaches terminal completion without real GitHub
-- [ ] DEMO_MODE refuses production
-- [ ] Local checks pass
-- [ ] Terminology guard passes
+## Rollback
+
+Revert this PR to restore prior AI/evaluation/seed behavior. This branch diff does not add database migration files, so no database migration rollback is expected. If a migration is added before merge, document and run the exact downgrade for that migration.
+
+## Reviewer checklist
+
+- [ ] Model preflight is still green.
+- [ ] Citation targets are real `/api/submissions/{id}` paths.
+- [ ] No `/view` fake target is emitted.
+- [ ] Candidate access is denied.
+- [ ] Unauthenticated access is denied.
+- [ ] Seeds are repeatable.
+- [ ] Winoe persona does not decide hire/no-hire.

@@ -67,6 +67,8 @@ class SettingsFields(BaseSettings):
     SCENARIO_GENERATION_MODEL: str = "claude-opus-4-7"
     SCENARIO_GENERATION_TIMEOUT_SECONDS: int = 120
     SCENARIO_GENERATION_MAX_RETRIES: int = 2
+    SCENARIO_GENERATION_FALLBACK_PROVIDER: str = "openai"
+    SCENARIO_GENERATION_FALLBACK_MODEL: str = "gpt-5.5"
 
     WINOE_REPORT_DAY1_RUNTIME_MODE: str | None = Field(
         default=None,
@@ -79,6 +81,8 @@ class SettingsFields(BaseSettings):
     WINOE_REPORT_DAY1_MODEL: str = "claude-opus-4-7"
     WINOE_REPORT_DAY1_TIMEOUT_SECONDS: int = 90
     WINOE_REPORT_DAY1_MAX_RETRIES: int = 2
+    WINOE_REPORT_DAY1_FALLBACK_PROVIDER: str = "openai"
+    WINOE_REPORT_DAY1_FALLBACK_MODEL: str = "gpt-5.5"
 
     WINOE_REPORT_DAY23_RUNTIME_MODE: str | None = Field(
         default=None,
@@ -91,6 +95,8 @@ class SettingsFields(BaseSettings):
     WINOE_REPORT_DAY23_MODEL: str = "gpt-5.5"
     WINOE_REPORT_DAY23_TIMEOUT_SECONDS: int = 120
     WINOE_REPORT_DAY23_MAX_RETRIES: int = 2
+    WINOE_REPORT_DAY23_FALLBACK_PROVIDER: str = "anthropic"
+    WINOE_REPORT_DAY23_FALLBACK_MODEL: str = "claude-sonnet-4-6"
 
     WINOE_REPORT_DAY4_RUNTIME_MODE: str | None = Field(
         default=None,
@@ -103,6 +109,8 @@ class SettingsFields(BaseSettings):
     WINOE_REPORT_DAY4_MODEL: str = "claude-sonnet-4-6"
     WINOE_REPORT_DAY4_TIMEOUT_SECONDS: int = 90
     WINOE_REPORT_DAY4_MAX_RETRIES: int = 2
+    WINOE_REPORT_DAY4_FALLBACK_PROVIDER: str = "openai"
+    WINOE_REPORT_DAY4_FALLBACK_MODEL: str = "gpt-5.5"
 
     WINOE_REPORT_DAY5_RUNTIME_MODE: str | None = Field(
         default=None,
@@ -115,6 +123,8 @@ class SettingsFields(BaseSettings):
     WINOE_REPORT_DAY5_MODEL: str = "claude-sonnet-4-6"
     WINOE_REPORT_DAY5_TIMEOUT_SECONDS: int = 90
     WINOE_REPORT_DAY5_MAX_RETRIES: int = 2
+    WINOE_REPORT_DAY5_FALLBACK_PROVIDER: str = "openai"
+    WINOE_REPORT_DAY5_FALLBACK_MODEL: str = "gpt-5.5"
 
     WINOE_REPORT_AGGREGATOR_RUNTIME_MODE: str | None = Field(
         default=None,
@@ -127,8 +137,8 @@ class SettingsFields(BaseSettings):
     WINOE_REPORT_AGGREGATOR_MODEL: str = "gpt-5.5"
     WINOE_REPORT_AGGREGATOR_TIMEOUT_SECONDS: int = 90
     WINOE_REPORT_AGGREGATOR_MAX_RETRIES: int = 2
-    WINOE_REPORT_ANTHROPIC_FALLBACK_DAY_MODEL: str = "claude-sonnet-4-6"
-    WINOE_REPORT_ANTHROPIC_FALLBACK_AGGREGATOR_MODEL: str = "claude-sonnet-4-6"
+    WINOE_REPORT_AGGREGATOR_FALLBACK_PROVIDER: str = "anthropic"
+    WINOE_REPORT_AGGREGATOR_FALLBACK_MODEL: str = "claude-sonnet-4-6"
 
     TRANSCRIPTION_RUNTIME_MODE: str | None = None
     TRANSCRIPTION_PROVIDER: str = "openai"

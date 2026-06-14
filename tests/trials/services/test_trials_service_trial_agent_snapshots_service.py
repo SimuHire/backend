@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -44,6 +45,26 @@ def test_trial_agent_snapshot_fixture_uses_runtime_specific_metadata() -> None:
         winoe.model_provider,
         winoe.model_name,
     )
+
+
+def test_winoe_prompt_assembly_includes_soul_persona_content() -> None:
+    snapshots = build_ai_policy_snapshot(trial=SimpleNamespace(agent_snapshots=[]))
+    winoe_prompt = snapshots["agents"]["winoeReport"]["resolvedInstructionsMd"]
+    soul_text = (
+        (
+            Path(__file__).resolve().parents[3]
+            / "app"
+            / "ai"
+            / "prompt_assets"
+            / "v4"
+            / "winoe_soul.md"
+        )
+        .read_text(encoding="utf-8")
+        .strip()
+    )
+
+    assert "## Persona Governance" in winoe_prompt
+    assert soul_text in winoe_prompt
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,10 @@ from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
 
 from app.ai import resolve_transcription_config
-from app.ai.ai_provider_clients_service import api_key_configured
+from app.ai.ai_provider_clients_service import (
+    api_key_configured,
+    openai_api_error_summary,
+)
 from app.config import settings
 from app.integrations.transcription.integrations_transcription_base_client import (
     TranscriptionProvider,
@@ -344,7 +347,7 @@ class OpenAITranscriptionProvider(TranscriptionProvider):
                         raise openai_error
             except Exception as exc:  # pragma: no cover - network/provider variability
                 raise TranscriptionProviderError(
-                    f"openai_transcription_failed:{type(exc).__name__}"
+                    f"openai_transcription_failed:{openai_api_error_summary(exc)}"
                 ) from exc
 
         transcript_text = _extract_text(response)

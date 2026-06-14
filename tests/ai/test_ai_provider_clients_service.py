@@ -42,6 +42,11 @@ def test_provider_client_helper_functions_cover_normalization_and_validation() -
     assert provider_clients._normalized_openai_reasoning("invalid") is None
     assert provider_clients._normalized_openai_text_verbosity("medium") == "medium"
     assert provider_clients._normalized_openai_text_verbosity("invalid") is None
+    assert provider_clients._normalize_openai_json_schema({"type": "object"}) == {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [],
+    }
 
 
 def test_call_openai_prompt_json_accepts_fenced_json_and_applies_request_options() -> (
@@ -477,3 +482,48 @@ def test_anthropic_api_error_summary_covers_body_type_fallback_branch() -> None:
 
     assert "RuntimeError" in summary
     assert "api_error_type=bad_request" in summary
+
+
+def test_openai_api_error_summary_covers_nested_body_and_truncation() -> None:
+    exc = RuntimeError("boom")
+    exc.status_code = 429
+    exc.request_id = "  req-1234567890abcdef  "
+    exc.body = {
+        "error": {
+            "type": " rate_limit_error ",
+            "message": " too many\nrequests " * 20,
+            "code": " rate_limit_exceeded ",
+        }
+    }
+
+    summary = provider_clients.openai_api_error_summary(exc, max_len=180)
+
+    assert summary.startswith("RuntimeError|http=429|request_id=req-1234567890abcdef")
+    assert "api_error_code=rate_limit_exceeded" in summary
+    assert "api_error_type=rate_limit_error" in summary
+    assert "api_error_message=too many requests" in summary
+    assert "\n" not in summary
+    assert len(summary) == 180
+
+
+def test_openai_api_error_summary_handles_missing_and_non_dict_body() -> None:
+    exc = RuntimeError("boom")
+    exc.status_code = 500
+    exc.body = ["not", "a", "dict"]
+
+    summary = provider_clients.openai_api_error_summary(exc)
+
+    assert summary == "RuntimeError|http=500"
+
+
+def test_openai_api_error_summary_uses_top_level_body_fallback_fields() -> None:
+    exc = RuntimeError("boom")
+    exc.body = {
+        "type": " invalid_request_error ",
+        "message": " bad\nrequest ",
+    }
+
+    summary = provider_clients.openai_api_error_summary(exc)
+
+    assert "api_error_type=invalid_request_error" in summary
+    assert "api_error_message=bad request" in summary

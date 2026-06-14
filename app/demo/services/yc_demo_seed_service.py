@@ -1560,11 +1560,10 @@ async def _clear_demo_scope(db: AsyncSession, config: DemoSeedConfig) -> None:
     trial_ids = [row.id for row in demo_trial_rows]
     company_ids = sorted({row.company_id for row in demo_trial_rows})
 
-    user_filters = [User.email.in_(candidate_emails)]
-    if company_ids:
-        user_filters.append(User.company_id.in_(company_ids))
     user_ids = (
-        (await db.execute(select(User.id).where(or_(*user_filters)))).scalars().all()
+        (await db.execute(select(User.id).where(User.email.in_(candidate_emails))))
+        .scalars()
+        .all()
     )
 
     candidate_session_filters = [CandidateSession.invite_email.in_(candidate_emails)]
@@ -1766,10 +1765,69 @@ async def _clear_demo_scope(db: AsyncSession, config: DemoSeedConfig) -> None:
     if trial_ids:
         await db.execute(delete(Trial).where(Trial.id.in_(trial_ids)))
 
+    deletable_user_ids = list(user_ids)
     if user_ids:
-        await db.execute(delete(User).where(User.id.in_(user_ids)))
+        non_demo_trial_owner_ids = (
+            (
+                await db.execute(
+                    select(Trial.created_by).where(
+                        Trial.created_by.in_(user_ids),
+                        Trial.id.notin_(trial_ids) if trial_ids else True,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        protected_user_ids = {int(user_id) for user_id in non_demo_trial_owner_ids}
+        deletable_user_ids = [
+            user_id for user_id in user_ids if int(user_id) not in protected_user_ids
+        ]
+        if deletable_user_ids:
+            await db.execute(delete(User).where(User.id.in_(deletable_user_ids)))
     if company_ids:
-        await db.execute(delete(Company).where(Company.id.in_(company_ids)))
+        remaining_trial_company_ids = (
+            (
+                await db.execute(
+                    select(Trial.company_id).where(
+                        Trial.company_id.in_(company_ids),
+                        Trial.id.notin_(trial_ids) if trial_ids else True,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        remaining_user_company_ids = (
+            (
+                await db.execute(
+                    select(User.company_id).where(
+                        User.company_id.in_(company_ids),
+                        User.id.notin_(deletable_user_ids)
+                        if deletable_user_ids
+                        else True,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        protected_company_ids = {
+            int(company_id)
+            for company_id in (
+                list(remaining_trial_company_ids) + list(remaining_user_company_ids)
+            )
+            if company_id is not None
+        }
+        deletable_company_ids = [
+            company_id
+            for company_id in company_ids
+            if int(company_id) not in protected_company_ids
+        ]
+        if deletable_company_ids:
+            await db.execute(
+                delete(Company).where(Company.id.in_(deletable_company_ids))
+            )
 
     await db.commit()
 
@@ -1809,19 +1867,52 @@ async def seed_yc_demo_dataset(
     """Create or replace the demo dataset in the current database."""
     await _clear_demo_scope(db, config)
 
-    company = Company(name=config.company_name)
-    db.add(company)
-    await db.flush()
-
-    talent_partner = User(
-        name=config.talent_partner_name,
-        email=config.talent_partner_email,
-        role="talent_partner",
-        company_id=company.id,
-        password_hash="",
+    company = await db.scalar(
+        select(Company).where(Company.name == config.company_name)
     )
-    db.add(talent_partner)
-    await db.flush()
+    if company is None:
+        company = Company(name=config.company_name)
+        db.add(company)
+        await db.flush()
+
+    talent_partner = await db.scalar(
+        select(User).where(User.email == config.talent_partner_email)
+    )
+    if talent_partner is None:
+        talent_partner = User(
+            name=config.talent_partner_name,
+            email=config.talent_partner_email,
+            role="talent_partner",
+            company_id=company.id,
+            password_hash="",
+        )
+        db.add(talent_partner)
+        await db.flush()
+    else:
+        talent_partner.name = config.talent_partner_name
+        talent_partner.role = "talent_partner"
+        talent_partner.company_id = company.id
+        await db.flush()
+
+    qa_candidate_email = config.qa_candidate_email.strip().lower()
+    qa_candidate_user = await db.scalar(
+        select(User).where(User.email == qa_candidate_email)
+    )
+    if qa_candidate_user is None:
+        qa_candidate_user = User(
+            name="Candidate",
+            email=qa_candidate_email,
+            role="candidate",
+            company_id=None,
+            password_hash="",
+        )
+        db.add(qa_candidate_user)
+        await db.flush()
+    else:
+        qa_candidate_user.name = "Candidate"
+        qa_candidate_user.role = "candidate"
+        qa_candidate_user.company_id = None
+        await db.flush()
 
     candidate_sessions: list[CandidateSession] = []
     repo_full_names: list[str] = []
@@ -2204,7 +2295,7 @@ async def seed_yc_demo_dataset(
     active_session = CandidateSession(
         trial_id=active_trial.id,
         scenario_version_id=active_scenario.id,
-        candidate_user_id=None,
+        candidate_user_id=qa_candidate_user.id,
         candidate_name=active_candidate.name,
         invite_email=active_candidate.email,
         candidate_email=active_candidate.email,

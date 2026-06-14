@@ -16,6 +16,8 @@ class WinoeReportReviewProviderError(RuntimeError):
 class WinoeReportDayReviewRequest:
     """Structured request for a single reviewer agent."""
 
+    agent_key: str
+    fallback_provider: str
     system_prompt: str
     user_prompt: str
     model: str
@@ -25,6 +27,8 @@ class WinoeReportDayReviewRequest:
 class WinoeReportAggregateRequest:
     """Structured request for the winoe-report aggregator."""
 
+    agent_key: str
+    fallback_provider: str
     system_prompt: str
     user_prompt: str
     model: str

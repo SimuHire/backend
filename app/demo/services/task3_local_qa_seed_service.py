@@ -328,13 +328,18 @@ async def seed_task3_local_qa(db, *, talent_partner_email: str) -> None:
         raise RuntimeError("task3 local QA seed is not allowed in production.")
 
     email = talent_partner_email.strip().lower()
-    company = await db.scalar(select(Company).where(Company.name == TASK3_QA_COMPANY))
     user = await db.scalar(select(User).where(User.email == email))
-
+    company = None
+    if user is not None and user.company_id is not None:
+        company = await db.scalar(select(Company).where(Company.id == user.company_id))
     if company is None:
-        company = Company(name=TASK3_QA_COMPANY)
-        db.add(company)
-        await db.flush()
+        company = await db.scalar(
+            select(Company).where(Company.name == TASK3_QA_COMPANY)
+        )
+        if company is None:
+            company = Company(name=TASK3_QA_COMPANY)
+            db.add(company)
+            await db.flush()
 
     if user is None:
         user = User(
@@ -346,8 +351,11 @@ async def seed_task3_local_qa(db, *, talent_partner_email: str) -> None:
         )
         db.add(user)
         await db.flush()
-    elif user.company_id != company.id:
+    elif user.company_id is None:
         user.company_id = company.id
+        await db.flush()
+    else:
+        user.role = "talent_partner"
         await db.flush()
 
     await purge_task3_local_qa(db, talent_partner_email=email)
@@ -370,7 +378,7 @@ async def seed_task3_local_qa(db, *, talent_partner_email: str) -> None:
             db,
             trial=t_active,
             scenario_version_id=scen_a.id,
-            invite_email=f"task3-active-{i}@local.test",
+            invite_email=f"task3-active-{i}@example.com",
             candidate_name=f"Active Candidate {i + 1}",
             status="in_progress",
         )
@@ -408,7 +416,7 @@ async def seed_task3_local_qa(db, *, talent_partner_email: str) -> None:
             db,
             trial=t_done,
             scenario_version_id=scen_d.id,
-            invite_email=f"task3-done-{i}@local.test",
+            invite_email=f"task3-done-{i}@example.com",
             candidate_name=f"Completed Candidate {i + 1}",
             status="completed",
         )

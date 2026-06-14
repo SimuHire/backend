@@ -66,31 +66,48 @@ def _view_url_for_citation(
         submission = submissions_by_day.get(4)
         if submission is None:
             return None
-        return f"/api/submissions/{submission.id}/view?range={artifact_ref.strip('[]')}"
+        return f"/api/submissions/{submission.id}"
 
     if artifact_ref.startswith("day1"):
         submission = submissions_by_day.get(1)
+    elif artifact_ref.startswith("day3"):
+        submission = submissions_by_day.get(3)
+    elif artifact_ref.startswith("day4"):
+        submission = submissions_by_day.get(4)
     elif artifact_ref.startswith("day5"):
         submission = submissions_by_day.get(5)
     elif artifact_type == "code_implementation":
         submission = submissions_by_day.get(3) or submissions_by_day.get(2)
+    elif artifact_type == "submission":
+        submission = (
+            submissions_by_day.get(1)
+            if artifact_ref.startswith("day1")
+            else submissions_by_day.get(3)
+            if artifact_ref.startswith("day3")
+            else submissions_by_day.get(4)
+            if artifact_ref.startswith("day4")
+            else submissions_by_day.get(5)
+            if artifact_ref.startswith("day5")
+            else None
+        )
     else:
         submission = None
 
     if submission is None:
         return None
 
+    return f"/api/submissions/{submission.id}"
+
+
+def _artifact_range_for_citation(citation: Any) -> str | None:
+    artifact_ref = getattr(citation, "artifact_ref", "") or ""
     markdown_match = _MARKDOWN_RANGE_RE.match(artifact_ref)
     if markdown_match is not None:
-        line_start = markdown_match.group("start")
-        line_end = markdown_match.group("end")
-        return f"/api/submissions/{submission.id}/view?range={line_start}-{line_end}"
-
+        return f"L{markdown_match.group('start')}-L{markdown_match.group('end')}"
     timestamp_match = _TIMESTAMP_RANGE_RE.match(artifact_ref)
     if timestamp_match is not None:
-        return f"/api/submissions/{submission.id}/view?range={artifact_ref.strip('[]')}"
-
-    return f"/api/submissions/{submission.id}/view"
+        return f"{timestamp_match.group('start')}-{timestamp_match.group('end')}"
+    return None
 
 
 async def get_report_citations(
@@ -127,14 +144,19 @@ async def get_report_citations(
     )
     payload_citations: list[dict[str, Any]] = []
     for citation in citations:
+        view_url = _view_url_for_citation(
+            citation=citation, submissions_by_day=submissions_by_day
+        )
         payload_citations.append(
             {
+                "citation_id": citation.id,
+                "dimension": citation.dimension,
                 "artifact_type": citation.artifact_type,
                 "artifact_ref": citation.artifact_ref,
+                "artifact_range": _artifact_range_for_citation(citation),
                 "excerpt": citation.excerpt,
-                "view_url": _view_url_for_citation(
-                    citation=citation, submissions_by_day=submissions_by_day
-                ),
+                "resolved_open_target": view_url,
+                "view_url": view_url,
             }
         )
     return {

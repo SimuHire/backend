@@ -7,6 +7,7 @@ from app.ai.ai_output_models import (
     ScenarioRubricDimension,
     ScenarioTaskPrompt,
 )
+from app.ai.ai_provider_clients_service import AIProviderExecutionError
 from app.integrations.scenario_generation.anthropic_provider_client import (
     AnthropicScenarioGenerationProvider,
 )
@@ -94,6 +95,8 @@ def test_anthropic_scenario_generation_provider_uses_larger_output_budget(
     provider = AnthropicScenarioGenerationProvider()
     response = provider.generate_scenario(
         request=ScenarioGenerationProviderRequest(
+            agent_key="prestart",
+            fallback_provider="openai",
             system_prompt="system",
             user_prompt="user",
             model="claude-3-5-sonnet-20241022",
@@ -105,3 +108,56 @@ def test_anthropic_scenario_generation_provider_uses_larger_output_budget(
     assert response.model_name == "claude-3-5-sonnet-20241022"
     assert response.model_version == "claude-3-5-sonnet-20241022"
     assert response.result.storyline_md == "Short scenario"
+
+
+def test_anthropic_scenario_generation_provider_uses_fallback_model_on_retryable_error(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def _fake_call_anthropic_json(**kwargs):
+        calls.append(("anthropic", kwargs["model"]))
+        raise AIProviderExecutionError("anthropic_request_failed:RateLimitError")
+
+    def _fake_call_openai_json_schema(**kwargs):
+        calls.append(("openai", kwargs["model"]))
+        return _scenario_generation_output()
+
+    monkeypatch.setattr(
+        "app.integrations.scenario_generation.anthropic_provider_client.call_anthropic_json",
+        _fake_call_anthropic_json,
+    )
+    monkeypatch.setattr(
+        "app.integrations.scenario_generation.anthropic_provider_client.call_openai_json_schema",
+        _fake_call_openai_json_schema,
+    )
+    monkeypatch.setattr(
+        "app.integrations.scenario_generation.anthropic_provider_client.settings.ANTHROPIC_API_KEY",
+        "anthropic-test-key",
+    )
+    monkeypatch.setattr(
+        "app.integrations.scenario_generation.anthropic_provider_client.settings.OPENAI_API_KEY",
+        "openai-test-key",
+    )
+    monkeypatch.setattr(
+        "app.integrations.scenario_generation.anthropic_provider_client.settings.SCENARIO_GENERATION_FALLBACK_MODEL",
+        "gpt-scenario-fallback",
+    )
+
+    provider = AnthropicScenarioGenerationProvider()
+    response = provider.generate_scenario(
+        request=ScenarioGenerationProviderRequest(
+            agent_key="prestart",
+            fallback_provider="openai",
+            system_prompt="system",
+            user_prompt="user",
+            model="claude-3-5-sonnet-20241022",
+        )
+    )
+
+    assert response.model_name == "gpt-scenario-fallback"
+    assert response.model_version == "gpt-scenario-fallback"
+    assert calls == [
+        ("anthropic", "claude-3-5-sonnet-20241022"),
+        ("openai", "gpt-scenario-fallback"),
+    ]

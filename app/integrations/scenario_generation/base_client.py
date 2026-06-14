@@ -16,6 +16,8 @@ class ScenarioGenerationProviderError(RuntimeError):
 class ScenarioGenerationProviderRequest:
     """Structured prompt request for scenario-generation providers."""
 
+    agent_key: str
+    fallback_provider: str
     system_prompt: str
     user_prompt: str
     model: str

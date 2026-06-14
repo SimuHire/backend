@@ -14,6 +14,7 @@ from app.ai import (
     require_ai_policy_snapshot,
     validate_ai_policy_snapshot_contract,
 )
+from app.config import settings
 from app.evaluations.services.evaluations_services_evaluations_evaluator_evidence_service import (
     _build_day_evidence,
 )
@@ -40,6 +41,18 @@ _MARKDOWN_RANGE_RE = re.compile(
 )
 _TIMESTAMP_RANGE_RE = re.compile(r"^\[(?P<start>\d{2}:\d{2})-(?P<end>\d{2}:\d{2})\]$")
 _SUBMISSION_REF_RE = re.compile(r"^submission:(?P<id>[1-9]\d*)$")
+
+
+def _fallback_provider_for_reviewer(reviewer_key: str) -> str:
+    if reviewer_key == "designDocReviewer":
+        return str(settings.WINOE_REPORT_DAY1_FALLBACK_PROVIDER or "")
+    if reviewer_key == "codeImplementationReviewer":
+        return str(settings.WINOE_REPORT_DAY23_FALLBACK_PROVIDER or "")
+    if reviewer_key == "demoPresentationReviewer":
+        return str(settings.WINOE_REPORT_DAY4_FALLBACK_PROVIDER or "")
+    if reviewer_key == "reflectionEssayReviewer":
+        return str(settings.WINOE_REPORT_DAY5_FALLBACK_PROVIDER or "")
+    raise LookupError(f"unsupported_reviewer_key:{reviewer_key}")
 
 
 class DeterministicWinoeReportEvaluator:
@@ -158,6 +171,8 @@ class LiveWinoeReportEvaluator:
                     scenario_version_id=bundle.scenario_version_id,
                 )
                 request = WinoeReportDayReviewRequest(
+                    agent_key=reviewer_key,
+                    fallback_provider=_fallback_provider_for_reviewer(reviewer_key),
                     system_prompt=system_prompt,
                     user_prompt=_build_day_review_prompt(
                         bundle=bundle,
@@ -232,6 +247,10 @@ class LiveWinoeReportEvaluator:
             provider = get_winoe_report_review_provider(aggregator_provider)
             aggregate_output = provider.aggregate_winoe_report(
                 request=WinoeReportAggregateRequest(
+                    agent_key="winoeReport",
+                    fallback_provider=str(
+                        settings.WINOE_REPORT_AGGREGATOR_FALLBACK_PROVIDER or ""
+                    ),
                     system_prompt=system_prompt,
                     user_prompt=json.dumps(
                         {

@@ -12,6 +12,7 @@ from app.ai import (
     require_agent_runtime,
     require_ai_policy_snapshot,
 )
+from app.config import settings
 from app.integrations.scenario_generation import (
     ScenarioGenerationProviderError,
     ScenarioGenerationProviderRequest,
@@ -193,6 +194,8 @@ def _generate_with_llm(
     provider = get_scenario_generation_provider(str(runtime["provider"]))
     snapshot_agent = require_agent_policy_snapshot(ai_policy_snapshot_json, "prestart")
     request = ScenarioGenerationProviderRequest(
+        agent_key="prestart",
+        fallback_provider=str(settings.SCENARIO_GENERATION_FALLBACK_PROVIDER or ""),
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model=str(runtime["model"]),

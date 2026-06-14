@@ -234,6 +234,93 @@ async def test_successful_pipeline_reaches_notification_state(async_session):
 
 
 @pytest.mark.asyncio
+async def test_fresh_seeded_submission_fast_forwards_through_terminal_states(
+    async_session, monkeypatch
+):
+    trial, _tasks, candidate_session = await _completed_trial_with_submissions(
+        async_session
+    )
+    await async_session.commit()
+    evaluator = TrialEvaluator(async_session)
+    transition_log: list[str] = []
+    original_transition = evaluator._transition
+
+    async def _recording_transition(*args, **kwargs):
+        state = args[1]
+        transition_log.append(state.value)
+        return await original_transition(*args, **kwargs)
+
+    monkeypatch.setattr(evaluator, "_transition", _recording_transition)
+
+    first = await evaluator.evaluate(
+        trial_id=trial.id,
+        candidate_session_id=candidate_session.id,
+    )
+    assert first.state == TrialEvaluationState.REVIEWERS_DISPATCHED
+
+    await _seed_reviewer_reports(async_session, candidate_session)
+    second = await evaluator.evaluate(
+        trial_id=trial.id,
+        candidate_session_id=candidate_session.id,
+    )
+
+    assert second.state == TrialEvaluationState.WINOE_SYNTHESIZING
+
+    report = WinoeReport(
+        candidate_session_id=candidate_session.id,
+        generated_at=datetime.now(UTC),
+    )
+    async_session.add(report)
+    await async_session.flush()
+    for citation in build_valid_winoe_report_json()["citations"]:
+        async_session.add(
+            WinoeReportCitation(
+                report_id=report.id,
+                dimension=str(citation["dimension"]),
+                artifact_type=str(citation["artifact_type"]),
+                artifact_ref=str(citation["artifact_ref"]),
+                excerpt=str(citation["excerpt"]),
+            )
+        )
+    async_session.add(
+        NotificationDeliveryAudit(
+            notification_type=WINOE_REPORT_READY_NOTIFICATION_JOB_TYPE,
+            candidate_session_id=candidate_session.id,
+            trial_id=trial.id,
+            recipient_email="tp-evaluator@test.com",
+            recipient_role="talent_partner",
+            subject="Jordan's Winoe Report is ready",
+            status="sent",
+            provider="test",
+            idempotency_key="report-ready-fast-forward",
+            attempted_at=datetime.now(UTC),
+            sent_at=datetime.now(UTC),
+        )
+    )
+    await async_session.commit()
+
+    third = await evaluator.evaluate(
+        trial_id=trial.id,
+        candidate_session_id=candidate_session.id,
+    )
+
+    assert third.state == TrialEvaluationState.NOTIFICATION_SENT
+    ordered_states = [
+        TrialEvaluationState.REVIEWERS_DISPATCHED.value,
+        TrialEvaluationState.REVIEWERS_COMPLETE.value,
+        TrialEvaluationState.WINOE_SYNTHESIZING.value,
+        TrialEvaluationState.EVIDENCE_TRAIL_VALIDATING.value,
+        TrialEvaluationState.REPORT_FINALIZED.value,
+        TrialEvaluationState.NOTIFICATION_SENT.value,
+    ]
+    index = -1
+    for state in ordered_states:
+        next_index = transition_log.index(state)
+        assert next_index > index
+        index = next_index
+
+
+@pytest.mark.asyncio
 async def test_reviewers_complete_waits_for_all_required_reviewers(async_session):
     trial, _tasks, candidate_session = await _completed_trial_with_submissions(
         async_session
